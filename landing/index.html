@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Habitt - Build Better Habits</title>
+  <meta name="description" content="A beautiful, privacy-first desktop habit tracker with heatmaps, journaling, AI insights, task management, and more." />
+  <style>
+    :root {
+      --primary: #22c55e;
+      --primary-dark: #16a34a;
+      --bg: #0f172a;
+      --bg-card: #1e293b;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --accent: #8b5cf6;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
+    
+    /* Hero */
+    .hero { padding: 6rem 0 4rem; text-align: center; position: relative; overflow: hidden; }
+    .hero::before {
+      content: '';
+      position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+      background: radial-gradient(circle at 50% 50%, rgba(34,197,94,0.08) 0%, transparent 60%);
+      animation: pulse 8s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+    
+    .logo { display: inline-flex; align-items: center; gap: 12px; margin-bottom: 2rem; position: relative; }
+    .logo-icon {
+      width: 56px; height: 56px; border-radius: 16px;
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 8px 24px rgba(34,197,94,0.3);
+    }
+    .logo-text { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.02em; }
+    
+    .hero h1 { font-size: 3.5rem; font-weight: 800; line-height: 1.1; margin-bottom: 1.5rem; position: relative; }
+    .hero h1 span { background: linear-gradient(135deg, #22c55e, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .hero p { font-size: 1.25rem; color: var(--text-muted); max-width: 600px; margin: 0 auto 2.5rem; position: relative; }
+    
+    .hero-buttons { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; position: relative; }
+    .btn {
+      padding: 0.875rem 2rem; border-radius: 14px; font-weight: 700; font-size: 1rem;
+      transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; border: none;
+    }
+    .btn-primary { background: var(--primary); color: white; box-shadow: 0 4px 16px rgba(34,197,94,0.3); }
+    .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(34,197,94,0.4); text-decoration: none; }
+    .btn-secondary { background: var(--bg-card); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { border-color: var(--primary); transform: translateY(-2px); text-decoration: none; }
+    
+    /* Features Grid */
+    .features { padding: 4rem 0; }
+    .features h2 { text-align: center; font-size: 2rem; font-weight: 800; margin-bottom: 0.5rem; }
+    .features .subtitle { text-align: center; color: var(--text-muted); margin-bottom: 3rem; font-size: 1.1rem; }
+    
+    .features-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.25rem;
+    }
+    .feature-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px;
+      padding: 1.75rem; transition: all 0.25s;
+    }
+    .feature-card:hover { border-color: var(--primary); transform: translateY(-4px); box-shadow: 0 12px 32px rgba(0,0,0,0.2); }
+    .feature-icon {
+      width: 48px; height: 48px; border-radius: 14px; display: flex;
+      align-items: center; justify-content: center; margin-bottom: 1rem;
+      font-size: 1.5rem;
+    }
+    .feature-card h3 { font-size: 1.125rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .feature-card p { color: var(--text-muted); font-size: 0.9375rem; line-height: 1.5; }
+    
+    /* Tech Stack */
+    .tech { padding: 3rem 0; text-align: center; }
+    .tech h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem; }
+    .tech-badges { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
+    .tech-badge {
+      padding: 0.5rem 1.25rem; border-radius: 99px;
+      background: var(--bg-card); border: 1px solid var(--border);
+      font-size: 0.875rem; font-weight: 600;
+    }
+    
+    /* Download */
+    .download { padding: 4rem 0; text-align: center; }
+    .download h2 { font-size: 2rem; font-weight: 800; margin-bottom: 0.5rem; }
+    .download .subtitle { color: var(--text-muted); margin-bottom: 2rem; }
+    .download-grid { display: flex; gap: 1.25rem; justify-content: center; flex-wrap: wrap; }
+    .download-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px;
+      padding: 2rem; min-width: 240px; text-align: center; transition: all 0.2s;
+    }
+    .download-card:hover { border-color: var(--primary); transform: translateY(-2px); }
+    .download-card h3 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+    .download-card p { color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1rem; }
+    
+    /* Footer */
+    footer { padding: 3rem 0; text-align: center; border-top: 1px solid var(--border); margin-top: 2rem; }
+    footer p { color: var(--text-muted); font-size: 0.875rem; }
+    
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 2.25rem; }
+      .hero p { font-size: 1rem; }
+      .features-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <div class="container">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+          </svg>
+        </div>
+        <span class="logo-text">Habitt</span>
+      </div>
+      <h1>Build better habits,<br/><span>one day at a time</span></h1>
+      <p>A beautiful, privacy-first desktop habit tracker with heatmaps, AI journaling, task management, homework tracking, and more. All data stays on your device.</p>
+      <div class="hero-buttons">
+        <a href="https://github.com/opngo/Habitt./releases" class="btn btn-primary">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download
+        </a>
+        <a href="https://github.com/opngo/Habitt." class="btn btn-secondary">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+          View on GitHub
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="features">
+    <div class="container">
+      <h2>Everything you need</h2>
+      <p class="subtitle">A complete system for building habits, tracking tasks, and reflecting on your progress</p>
+      
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon" style="background: rgba(34,197,94,0.12);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </div>
+          <h3>GitHub-Style Heatmap</h3>
+          <p>Beautiful year/month/week activity grids with rich tooltips showing completed habits and notes per day.</p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon" style="background: rgba(59,130,246,0.12);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          </div>
+          <h3>Tasks & Subtasks</h3>
+          <p>Full task management with priorities, due dates, tags, subtasks, and status tracking. Kanban-style organization.</p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon" style="background: rgba(139,92,246,0.12);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          </div>
+          <h3>AI Journaling</h3>
+          <p>Ollama-powered AI reflections, writing prompts, and mood analysis. Export to Obsidian daily notes format.</p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon" style="background: rgba(245,158,11,0.12);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          </div>
+          <h3>Homework Tracker</h3>
+          <p>Color-coded assignments by subject. Custom subjects with icons. Due date tracking with overdue alerts.</p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon" style="background: rgba(249,115,22,0.12);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <h3>Focus Timer</h3>
+          <p>Pomodoro timer with presets, round tracking, session history, and XP rewards. Tie sessions to specific habits.</p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon" style="background: rgba(236,72,153,0.12);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          </div>
+          <h3>3 Habit Types</h3>
+          <p>Normal (check off), Avoid (track relapses), and Amount (quantity goals with units). Checklists for multi-step habits.</p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon" style="background: rgba(6,182,212,0.12);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          </div>
+          <h3>Rich Statistics</h3>
+          <p>Streak leaderboards, day-of-week patterns, monthly trends, habit strength scores, and hourly consistency analysis.</p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon" style="background: rgba(132,204,22,0.12);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#84cc16" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <h3>Notes with Tags</h3>
+          <p>Quick notes with colors, icons, tags, and pinning. Search across all notes. Edit inline.</p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon" style="background: rgba(244,63,94,0.12);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+          <h3>Gamification</h3>
+          <p>XP system, 28+ achievements, levels, confetti celebrations, and streak milestones to keep you motivated.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tech">
+    <div class="container">
+      <h2>Built with modern tools</h2>
+      <div class="tech-badges">
+        <span class="tech-badge">React 18</span>
+        <span class="tech-badge">Reshaped UI</span>
+        <span class="tech-badge">Lucide Icons</span>
+        <span class="tech-badge">Tauri 2</span>
+        <span class="tech-badge">Rust</span>
+        <span class="tech-badge">SQLite</span>
+        <span class="tech-badge">Zustand</span>
+        <span class="tech-badge">Ollama AI</span>
+        <span class="tech-badge">Obsidian Export</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="download">
+    <div class="container">
+      <h2>Download Habitt</h2>
+      <p class="subtitle">Free and open source. Available for Windows and Linux.</p>
+      <div class="download-grid">
+        <div class="download-card">
+          <h3>Windows</h3>
+          <p>Installer (.exe) or Portable</p>
+          <a href="https://github.com/opngo/Habitt./releases" class="btn btn-primary" style="font-size:0.875rem; padding: 0.625rem 1.5rem;">Download</a>
+        </div>
+        <div class="download-card">
+          <h3>Linux</h3>
+          <p>.deb, AppImage</p>
+          <a href="https://github.com/opngo/Habitt./releases" class="btn btn-primary" style="font-size:0.875rem; padding: 0.625rem 1.5rem;">Download</a>
+        </div>
+        <div class="download-card">
+          <h3>Source</h3>
+          <p>Build from source</p>
+          <a href="https://github.com/opngo/Habitt." class="btn btn-secondary" style="font-size:0.875rem; padding: 0.625rem 1.5rem;">GitHub</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="container">
+      <p>Habitt is open source under the MIT License. Built with care.</p>
+      <p style="margin-top: 0.5rem;">
+        <a href="https://github.com/opngo/Habitt.">GitHub</a> &middot;
+        <a href="https://github.com/opngo/Habitt./issues">Issues</a> &middot;
+        <a href="https://github.com/opngo/Habitt./releases">Releases</a>
+      </p>
+    </div>
+  </footer>
+</body>
+</html>

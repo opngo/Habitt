@@ -1,0 +1,38 @@
+name: Build All Platforms
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  trigger-windows:
+    name: Trigger Windows Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Windows workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build-windows.yml',
+              ref: context.ref
+            })
+
+  trigger-linux:
+    name: Trigger Linux Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Linux workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build-linux.yml',
+              ref: context.ref
+            })

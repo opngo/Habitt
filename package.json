@@ -1,0 +1,36 @@
+{
+  "name": "habitt",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Habitt. - A beautiful desktop habit tracker with heatmaps, journaling, and streaks",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-sql": "^2.0.0",
+    "@tauri-apps/plugin-store": "^2.0.0",
+    "@tauri-apps/plugin-dialog": "^2.0.0",
+    "@tauri-apps/plugin-fs": "^2.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "reshaped": "^3.0.0",
+    "lucide-react": "^0.460.0",
+    "zustand": "^5.0.0",
+    "date-fns": "^4.1.0",
+    "canvas-confetti": "^1.9.3",
+    "framer-motion": "^11.11.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.0.0",
+    "typescript": "^5.6.0"
+  }
+}
