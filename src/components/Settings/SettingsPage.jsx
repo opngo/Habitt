@@ -1,208 +1,198 @@
 import React, { useState } from 'react';
-import { View, Text, Button, Icon, Switch, Divider } from 'reshaped';
-import { Sun, Moon, Lock, Unlock, Download, Upload, Database, Shield, Eye, EyeOff, Palette, HardDrive } from 'lucide-react';
+import { View, Text, Button, Icon, Badge, Divider } from 'reshaped';
+import { Sun, Moon, Lock, Unlock, Download, Upload, Shield, Eye, EyeOff, Plus, Trash2, Palette } from 'lucide-react';
 import { useStore } from '../../lib/store';
-import { saveSetting, getSetting, hashPassword, verifyPassword } from '../../lib/db';
+import { saveSetting, getSetting, hashPassword, verifyPassword, createSubject, updateSubject, deleteSubject } from '../../lib/db';
+import { downloadObsidianVault } from '../../lib/obsidian';
+import DynIcon from '../Shared/DynIcon';
+import IconPicker from '../Shared/IconPicker';
+import ColorPicker from '../Shared/ColorPicker';
+import { COLORS, HABIT_ICON_NAMES } from '../../lib/constants';
 
 export default function SettingsPage({ refreshData }) {
-  const { colorMode, setColorMode, passwordEnabled, setPasswordEnabled,
-    habits, completions, journalEntries, addToast } = useStore();
-
+  const { colorMode, setColorMode, passwordEnabled, setPasswordEnabled, habits, completions, journalEntries, tasks, subjects, addToast } = useStore();
   const [currentPwd, setCurrentPwd] = useState('');
   const [newPwd, setNewPwd] = useState('');
   const [confirmPwd, setConfirmPwd] = useState('');
   const [pwdMsg, setPwdMsg] = useState('');
   const [showPwd, setShowPwd] = useState(false);
+  const [showSubjectForm, setShowSubjectForm] = useState(false);
+  const [editingSubject, setEditingSubject] = useState(null);
+  const [subjectForm, setSubjectForm] = useState({ name: '', color: '#3b82f6', icon: 'BookOpen' });
+  const [showIconPicker, setShowIconPicker] = useState(false);
 
   async function toggleTheme() {
-    const newMode = colorMode === 'light' ? 'dark' : 'light';
-    setColorMode(newMode);
-    await saveSetting('theme', newMode);
-    addToast({ type: 'info', message: `Theme changed to ${newMode}` });
+    const m = colorMode === 'light' ? 'dark' : 'light';
+    setColorMode(m); await saveSetting('theme', m);
+    addToast({ type: 'info', message: `Theme changed to ${m}` });
   }
 
   async function setPassword() {
-    if (newPwd.length < 4) { setPwdMsg('Password must be at least 4 characters'); return; }
+    if (newPwd.length < 4) { setPwdMsg('Min 4 characters'); return; }
     if (newPwd !== confirmPwd) { setPwdMsg('Passwords do not match'); return; }
-    const hash = await hashPassword(newPwd);
-    await saveSetting('password_hash', hash);
-    setPasswordEnabled(true);
-    setPwdMsg('Password set successfully!');
-    setNewPwd(''); setConfirmPwd('');
-    addToast({ type: 'success', message: 'Password protection enabled' });
+    await saveSetting('password_hash', await hashPassword(newPwd));
+    setPasswordEnabled(true); setPwdMsg('Password set!'); setNewPwd(''); setConfirmPwd('');
+    addToast({ type: 'success', message: 'Password enabled' });
   }
 
   async function removePassword() {
-    if (!currentPwd) { setPwdMsg('Enter your current password'); return; }
-    const savedHash = await getSetting('password_hash');
-    const valid = await verifyPassword(currentPwd, savedHash);
-    if (!valid) { setPwdMsg('Incorrect password'); return; }
-    await saveSetting('password_hash', '');
-    setPasswordEnabled(false);
-    setPwdMsg('Password removed');
-    setCurrentPwd('');
-    addToast({ type: 'info', message: ' Password protection removed' });
+    if (!currentPwd) { setPwdMsg('Enter current password'); return; }
+    const valid = await verifyPassword(currentPwd, await getSetting('password_hash'));
+    if (!valid) { setPwdMsg('Incorrect'); return; }
+    await saveSetting('password_hash', ''); setPasswordEnabled(false); setCurrentPwd('');
+    addToast({ type: 'info', message: 'Password removed' });
   }
 
   function exportData() {
-    const data = {
-      habits, completions, journalEntries,
-      exportedAt: new Date().toISOString(),
-      version: '1.0.0'
-    };
+    const data = { habits, completions, journalEntries, tasks, subjects, exportedAt: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `habitt-export-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    addToast({ type: 'success', message: 'Data exported successfully!' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `habitt-export-${new Date().toISOString().split('T')[0]}.json`; a.click();
+    addToast({ type: 'success', message: 'Data exported!' });
   }
 
-  const inputStyle = {
-    padding: '8px 12px', borderRadius: 8, width: '100%',
-    border: '1px solid var(--rs-color-border-neutral-faded)',
-    background: 'var(--rs-color-background-neutral-default)',
-    color: 'var(--rs-color-foreground-neutral-default)',
-    fontSize: '0.875rem',
-  };
+  function exportObsidian() {
+    downloadObsidianVault(journalEntries, habits, completions, tasks);
+    addToast({ type: 'success', message: 'Obsidian vault exported!' });
+  }
+
+  async function handleSaveSubject() {
+    if (!subjectForm.name.trim()) return;
+    if (editingSubject) { await updateSubject(editingSubject.id, subjectForm); }
+    else { await createSubject(subjectForm); }
+    await refreshData();
+    setShowSubjectForm(false); setEditingSubject(null);
+    setSubjectForm({ name: '', color: '#3b82f6', icon: 'BookOpen' });
+    addToast({ type: 'success', message: editingSubject ? 'Subject updated' : 'Subject created' });
+  }
+
+  async function handleDeleteSubject(id) {
+    if (confirm('Delete this subject? Associated homework will also be removed.')) {
+      await deleteSubject(id); await refreshData();
+      addToast({ type: 'info', message: 'Subject deleted' });
+    }
+  }
+
+  const inputStyle = { padding: '8px 12px', borderRadius: 12, width: '100%', border: '1px solid var(--rs-color-border-neutral-faded)', background: 'var(--rs-color-background-neutral-default)', color: 'var(--rs-color-foreground-neutral-default)', fontSize: '0.875rem' };
 
   return (
-    <div className="animate-fade-in" style={{ maxWidth: 700 }}>
-      <View marginBottom={6}>
-        <Text variant="title-1" weight="bold">Settings</Text>
-        <Text variant="body-2" color="neutral-faded">Customize your Habitt. experience</Text>
-      </View>
+    <div className="animate-fade-in" style={{ maxWidth: 750 }}>
+      <Text variant="title-1" weight="bold" marginBottom={1}>Settings</Text>
+      <Text variant="body-2" color="neutral-faded" marginBottom={6}>Customize your Habitt experience</Text>
 
       {/* Appearance */}
-      <View padding={5} marginBottom={4} style={{
-        background: 'var(--rs-color-background-neutral-default)',
-        border: '1px solid var(--rs-color-border-neutral-faded)', borderRadius: 12,
-      }}>
-        <Text variant="title-3" weight="bold" marginBottom={4}> Appearance</Text>
+      <View padding={5} marginBottom={4} style={{ background: 'var(--rs-color-background-neutral-default)', border: '1px solid var(--rs-color-border-neutral-faded)', borderRadius: 16 }}>
+        <Text variant="title-3" weight="bold" marginBottom={4}>Appearance</Text>
         <View direction="row" align="center" style={{ justifyContent: 'space-between' }}>
-          <View>
-            <Text variant="body-2" weight="bold">Theme</Text>
-            <Text variant="caption-1" color="neutral-faded">Switch between light and dark mode</Text>
-          </View>
-          <Button
-            variant="faded"
-            color="neutral"
-            startIcon={<Icon svg={colorMode === 'light' ? <Sun size={16} /> : <Moon size={16} />} />}
-            onClick={toggleTheme}
-          >
-            {colorMode === 'light' ? 'Light' : 'Dark'}
+          <View><Text variant="body-2" weight="bold">Theme</Text><Text variant="caption-1" color="neutral-faded">Light or dark mode</Text></View>
+          <Button variant="faded" color="neutral" startIcon={<Icon svg={colorMode==='light'?<Sun size={16}/>:<Moon size={16}/>} />} onClick={toggleTheme}>
+            {colorMode==='light'?'Light':'Dark'}
           </Button>
         </View>
       </View>
 
-      {/* Password */}
-      <View padding={5} marginBottom={4} style={{
-        background: 'var(--rs-color-background-neutral-default)',
-        border: '1px solid var(--rs-color-border-neutral-faded)', borderRadius: 12,
-      }}>
-        <Text variant="title-3" weight="bold" marginBottom={2}> Password Protection</Text>
-        <Text variant="caption-1" color="neutral-faded" marginBottom={4}>
-          Optionally protect your habits and journal with a password
-        </Text>
-
-        {passwordEnabled ? (
-          <View gap={3}>
-            <View padding={3} style={{ background: 'rgba(34,197,94,0.08)', borderRadius: 8, border: '1px solid rgba(34,197,94,0.2)' }}>
-              <Text variant="body-3" color="success"> Password protection is enabled</Text>
-            </View>
-            <div style={{ position: 'relative' }}>
-              <input type={showPwd ? 'text' : 'password'} value={currentPwd} onChange={e => setCurrentPwd(e.target.value)}
-                placeholder="Current password" style={inputStyle} />
-              <button onClick={() => setShowPwd(!showPwd)} style={{
-                position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-                background: 'none', border: 'none', cursor: 'pointer', color: 'var(--rs-color-foreground-neutral-faded)',
-              }}>{showPwd ? <EyeOff size={16} /> : <Eye size={16} />}</button>
-            </div>
-            <Button variant="faded" color="critical" startIcon={<Icon svg={<Unlock size={14} />} />} onClick={removePassword}>
-              Remove Password
-            </Button>
-          </View>
-        ) : (
-          <View gap={3}>
-            <View padding={3} style={{ background: 'var(--rs-color-background-neutral-faded)', borderRadius: 8 }}>
-              <Text variant="body-3" color="neutral-faded">Password protection is disabled</Text>
-            </View>
-            <input type="password" value={newPwd} onChange={e => setNewPwd(e.target.value)}
-              placeholder="New password (min 4 chars)" style={inputStyle} />
-            <input type="password" value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)}
-              placeholder="Confirm password" style={inputStyle} />
-            <Button color="primary" startIcon={<Icon svg={<Lock size={14} />} />} onClick={setPassword}>
-              Set Password
-            </Button>
-          </View>
-        )}
-        {pwdMsg && (
-          <View marginTop={2} padding={2} style={{
-            background: pwdMsg.includes('') || pwdMsg.includes('removed') ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)',
-            borderRadius: 6,
-          }}>
-            <Text variant="caption-1" color={pwdMsg.includes('') || pwdMsg.includes('removed') ? 'success' : 'critical'}>
-              {pwdMsg}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Data Management */}
-      <View padding={5} marginBottom={4} style={{
-        background: 'var(--rs-color-background-neutral-default)',
-        border: '1px solid var(--rs-color-border-neutral-faded)', borderRadius: 12,
-      }}>
-        <Text variant="title-3" weight="bold" marginBottom={4}> Data Management</Text>
-        <View direction="row" gap={3} marginBottom={4}>
-          <Button variant="faded" color="neutral" startIcon={<Icon svg={<Download size={14} />} />} onClick={exportData}>
-            Export Data
-          </Button>
-          <Button variant="faded" color="neutral" startIcon={<Icon svg={<Upload size={14} />} />} onClick={() => {
-            const input = document.createElement('input');
-            input.type = 'file'; input.accept = '.json';
-            input.onchange = async (e) => {
-              addToast({ type: 'info', message: 'Import feature coming soon!' });
-            };
-            input.click();
-          }}>
-            Import Data
-          </Button>
+      {/* Subjects (for Homework) */}
+      <View padding={5} marginBottom={4} style={{ background: 'var(--rs-color-background-neutral-default)', border: '1px solid var(--rs-color-border-neutral-faded)', borderRadius: 16 }}>
+        <View direction="row" align="center" gap={2} marginBottom={4} style={{ justifyContent: 'space-between' }}>
+          <Text variant="title-3" weight="bold">Subjects</Text>
+          <Button size="small" color="primary" onClick={() => { setShowSubjectForm(!showSubjectForm); setEditingSubject(null); setSubjectForm({ name: '', color: '#3b82f6', icon: 'BookOpen' }); }}
+            startIcon={<Icon svg={<Plus size={14} />} />}>Add Subject</Button>
         </View>
-        <View direction="row" gap={6}>
-          {[
-            { value: habits.length, label: 'Habits' },
-            { value: completions.length, label: 'Completions' },
-            { value: journalEntries.length, label: 'Journal Entries' },
-          ].map((s, i) => (
-            <View key={i} align="center">
-              <Text variant="display-2" weight="bold" color="primary">{s.value}</Text>
-              <Text variant="caption-1" color="neutral-faded">{s.label}</Text>
+        <Text variant="caption-1" color="neutral-faded" marginBottom={3}>Subjects are used to color-code homework assignments</Text>
+
+        {showSubjectForm && (
+          <View padding={4} marginBottom={3} className="animate-slide-up" style={{ background: 'var(--rs-color-background-neutral-faded)', borderRadius: 14 }}>
+            <View gap={3}>
+              <input value={subjectForm.name} onChange={e => setSubjectForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="Subject name (e.g. Mathematics)" style={inputStyle} autoFocus />
+              <View>
+                <Text variant="caption-1" weight="bold" color="neutral-faded" marginBottom={2}>Color</Text>
+                <ColorPicker selected={subjectForm.color} onSelect={c => setSubjectForm(f => ({ ...f, color: c }))} />
+              </View>
+              <View>
+                <Text variant="caption-1" weight="bold" color="neutral-faded" marginBottom={2}>Icon</Text>
+                <button onClick={() => setShowIconPicker(!showIconPicker)} style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 12,
+                  border: '1px solid var(--rs-color-border-neutral-faded)', background: 'var(--rs-color-background-neutral-default)', cursor: 'pointer',
+                }}>
+                  <DynIcon name={subjectForm.icon} size={20} color={subjectForm.color} />
+                  <Text variant="body-3">{subjectForm.icon}</Text>
+                </button>
+                {showIconPicker && <div style={{ marginTop: 8 }}><IconPicker selected={subjectForm.icon} onSelect={n => { setSubjectForm(f => ({ ...f, icon: n })); setShowIconPicker(false); }} color={subjectForm.color} /></div>}
+              </View>
+              <View direction="row" gap={2} style={{ justifyContent: 'flex-end' }}>
+                <Button variant="faded" color="neutral" onClick={() => setShowSubjectForm(false)}>Cancel</Button>
+                <Button color="primary" onClick={handleSaveSubject}>Save Subject</Button>
+              </View>
+            </View>
+          </View>
+        )}
+
+        <View gap={2}>
+          {subjects.length === 0 ? (
+            <Text variant="body-3" color="neutral-faded" style={{ fontStyle: 'italic' }}>No subjects yet. Add your school subjects above.</Text>
+          ) : subjects.map(sub => (
+            <View key={sub.id} direction="row" align="center" gap={3} padding={3} style={{
+              borderRadius: 12, border: '1px solid var(--rs-color-border-neutral-faded)',
+              borderLeft: `4px solid ${sub.color}`,
+            }}>
+              <DynIcon name={sub.icon || 'BookOpen'} size={20} color={sub.color} />
+              <Text variant="body-2" weight="bold" style={{ flex: 1, color: sub.color }}>{sub.name}</Text>
+              <button onClick={() => { setEditingSubject(sub); setSubjectForm({ name: sub.name, color: sub.color, icon: sub.icon || 'BookOpen' }); setShowSubjectForm(true); }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--rs-color-foreground-neutral-faded)', fontSize: '0.75rem', fontWeight: 600 }}>Edit</button>
+              <button onClick={() => handleDeleteSubject(sub.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--rs-color-foreground-critical-default)' }}>
+                <Trash2 size={14} />
+              </button>
             </View>
           ))}
         </View>
       </View>
 
-      {/* About */}
-      <View padding={5} style={{
-        background: 'var(--rs-color-background-neutral-default)',
-        border: '1px solid var(--rs-color-border-neutral-faded)', borderRadius: 12,
-      }}>
-        <Text variant="title-3" weight="bold" marginBottom={3}>About</Text>
-        <View gap={2}>
-          <Text variant="body-2"><strong>Habitt.</strong> v1.0.0</Text>
-          <Text variant="body-3" color="neutral-faded">
-            A beautiful, privacy-first habit tracker for your desktop.
-          </Text>
-          <Text variant="body-3" color="neutral-faded">
-            All data is stored locally on your device. No cloud, no tracking, no ads.
-          </Text>
-          <Text variant="caption-1" color="neutral-faded" marginTop={2}>
-            Built with React, Reshaped UI, Lucide Icons, Tauri, and SQLite.
-          </Text>
+      {/* Password */}
+      <View padding={5} marginBottom={4} style={{ background: 'var(--rs-color-background-neutral-default)', border: '1px solid var(--rs-color-border-neutral-faded)', borderRadius: 16 }}>
+        <Text variant="title-3" weight="bold" marginBottom={2}>Password Protection</Text>
+        <Text variant="caption-1" color="neutral-faded" marginBottom={4}>Optionally protect with a password</Text>
+        {passwordEnabled ? (
+          <View gap={3}>
+            <View padding={3} style={{ background: 'rgba(34,197,94,0.08)', borderRadius: 10 }}><Text variant="body-3" color="success">Password enabled</Text></View>
+            <input type={showPwd?'text':'password'} value={currentPwd} onChange={e=>setCurrentPwd(e.target.value)} placeholder="Current password" style={inputStyle} />
+            <Button variant="faded" color="critical" onClick={removePassword} startIcon={<Icon svg={<Unlock size={14}/>} />}>Remove</Button>
+          </View>
+        ) : (
+          <View gap={3}>
+            <input type="password" value={newPwd} onChange={e=>setNewPwd(e.target.value)} placeholder="New password (min 4)" style={inputStyle} />
+            <input type="password" value={confirmPwd} onChange={e=>setConfirmPwd(e.target.value)} placeholder="Confirm" style={inputStyle} />
+            <Button color="primary" onClick={setPassword} startIcon={<Icon svg={<Lock size={14}/>} />}>Set Password</Button>
+          </View>
+        )}
+        {pwdMsg && <Text variant="caption-1" color={pwdMsg.includes('set')||pwdMsg.includes('removed')?'success':'critical'} marginTop={2}>{pwdMsg}</Text>}
+      </View>
+
+      {/* Data */}
+      <View padding={5} marginBottom={4} style={{ background: 'var(--rs-color-background-neutral-default)', border: '1px solid var(--rs-color-border-neutral-faded)', borderRadius: 16 }}>
+        <Text variant="title-3" weight="bold" marginBottom={4}>Data Management</Text>
+        <View direction="row" gap={2} marginBottom={4} style={{ flexWrap: 'wrap' }}>
+          <Button variant="faded" color="neutral" onClick={exportData} startIcon={<Icon svg={<Download size={14}/>} />}>Export JSON</Button>
+          <Button variant="faded" color="neutral" onClick={exportObsidian} startIcon={<Icon svg={<Download size={14}/>} />}>Export Obsidian Vault</Button>
+          <Button variant="faded" color="neutral" onClick={() => {
+            const input = document.createElement('input'); input.type='file'; input.accept='.json';
+            input.onchange = async (e) => { addToast({ type: 'info', message: 'Import coming soon!' }); };
+            input.click();
+          }} startIcon={<Icon svg={<Upload size={14}/>} />}>Import</Button>
         </View>
+        <View direction="row" gap={6}>
+          {[{v:habits.length,l:'Habits'},{v:completions.length,l:'Completions'},{v:journalEntries.length,l:'Journals'},{v:tasks.length,l:'Tasks'},{v:subjects.length,l:'Subjects'}].map((s,i)=>(
+            <View key={i} align="center"><Text variant="display-2" weight="bold" color="primary">{s.v}</Text><Text variant="caption-1" color="neutral-faded">{s.l}</Text></View>
+          ))}
+        </View>
+      </View>
+
+      {/* About */}
+      <View padding={5} style={{ background: 'var(--rs-color-background-neutral-default)', border: '1px solid var(--rs-color-border-neutral-faded)', borderRadius: 16 }}>
+        <Text variant="title-3" weight="bold" marginBottom={3}>About</Text>
+        <Text variant="body-2"><strong>Habitt</strong> v1.0.0</Text>
+        <Text variant="body-3" color="neutral-faded" marginTop={1}>Privacy-first habit tracker. All data local. No cloud, no ads.</Text>
+        <Text variant="caption-1" color="neutral-faded" marginTop={2}>React + Reshaped UI + Lucide Icons + Tauri + SQLite + Ollama AI</Text>
       </View>
     </div>
   );

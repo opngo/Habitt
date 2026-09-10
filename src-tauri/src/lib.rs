@@ -17,7 +17,7 @@ pub fn run() {
                     vec![
                         Migration {
                             version: 1,
-                            description: "create initial tables",
+                            description: "create all tables",
                             sql: r#"
                                 CREATE TABLE IF NOT EXISTS habits (
                                     id TEXT PRIMARY KEY,
@@ -34,6 +34,7 @@ pub fn run() {
                                     target_count INTEGER DEFAULT 1,
                                     unit TEXT DEFAULT '',
                                     checklist TEXT DEFAULT '[]',
+                                    tags TEXT DEFAULT '[]',
                                     reminder_enabled INTEGER DEFAULT 0,
                                     reminder_time TEXT DEFAULT '',
                                     difficulty TEXT DEFAULT 'medium',
@@ -52,15 +53,69 @@ pub fn run() {
                                     amount REAL DEFAULT 0,
                                     note TEXT DEFAULT '',
                                     checklist_done TEXT DEFAULT '[]',
+                                    tags TEXT DEFAULT '[]',
                                     created_at TEXT DEFAULT (datetime('now')),
                                     FOREIGN KEY (habit_id) REFERENCES habits(id) ON DELETE CASCADE,
                                     UNIQUE(habit_id, date)
+                                );
+
+                                CREATE TABLE IF NOT EXISTS tasks (
+                                    id TEXT PRIMARY KEY,
+                                    title TEXT NOT NULL,
+                                    description TEXT DEFAULT '',
+                                    parent_id TEXT DEFAULT NULL,
+                                    project_id TEXT DEFAULT NULL,
+                                    priority TEXT DEFAULT 'medium',
+                                    status TEXT DEFAULT 'todo',
+                                    due_date TEXT DEFAULT NULL,
+                                    tags TEXT DEFAULT '[]',
+                                    icon TEXT DEFAULT 'Circle',
+                                    color TEXT DEFAULT '#6366f1',
+                                    sort_order INTEGER DEFAULT 0,
+                                    completed_at TEXT DEFAULT NULL,
+                                    created_at TEXT DEFAULT (datetime('now')),
+                                    FOREIGN KEY (parent_id) REFERENCES tasks(id) ON DELETE CASCADE
+                                );
+
+                                CREATE TABLE IF NOT EXISTS notes (
+                                    id TEXT PRIMARY KEY,
+                                    title TEXT NOT NULL,
+                                    content TEXT DEFAULT '',
+                                    tags TEXT DEFAULT '[]',
+                                    color TEXT DEFAULT '#6366f1',
+                                    icon TEXT DEFAULT 'FileText',
+                                    pinned INTEGER DEFAULT 0,
+                                    created_at TEXT DEFAULT (datetime('now')),
+                                    updated_at TEXT DEFAULT (datetime('now'))
+                                );
+
+                                CREATE TABLE IF NOT EXISTS homework (
+                                    id TEXT PRIMARY KEY,
+                                    title TEXT NOT NULL,
+                                    description TEXT DEFAULT '',
+                                    subject_id TEXT NOT NULL,
+                                    due_date TEXT NOT NULL,
+                                    status TEXT DEFAULT 'pending',
+                                    priority TEXT DEFAULT 'medium',
+                                    tags TEXT DEFAULT '[]',
+                                    completed_at TEXT DEFAULT NULL,
+                                    created_at TEXT DEFAULT (datetime('now')),
+                                    FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
+                                );
+
+                                CREATE TABLE IF NOT EXISTS subjects (
+                                    id TEXT PRIMARY KEY,
+                                    name TEXT NOT NULL,
+                                    color TEXT NOT NULL,
+                                    icon TEXT DEFAULT 'BookOpen',
+                                    sort_order INTEGER DEFAULT 0
                                 );
 
                                 CREATE TABLE IF NOT EXISTS day_notes (
                                     id TEXT PRIMARY KEY,
                                     date TEXT NOT NULL UNIQUE,
                                     content TEXT DEFAULT '',
+                                    tags TEXT DEFAULT '[]',
                                     created_at TEXT DEFAULT (datetime('now')),
                                     updated_at TEXT DEFAULT (datetime('now'))
                                 );
@@ -73,7 +128,8 @@ pub fn run() {
                                     gratitude TEXT DEFAULT '',
                                     sleep_hours REAL DEFAULT NULL,
                                     energy INTEGER DEFAULT 3,
-                                    tags TEXT DEFAULT '',
+                                    tags TEXT DEFAULT '[]',
+                                    ai_summary TEXT DEFAULT '',
                                     created_at TEXT DEFAULT (datetime('now')),
                                     updated_at TEXT DEFAULT (datetime('now'))
                                 );
@@ -83,7 +139,7 @@ pub fn run() {
                                     habit_id TEXT DEFAULT NULL,
                                     started_at TEXT NOT NULL,
                                     duration_minutes INTEGER NOT NULL,
-                    completed INTEGER DEFAULT 0,
+                                    completed INTEGER DEFAULT 0,
                                     notes TEXT DEFAULT '',
                                     FOREIGN KEY (habit_id) REFERENCES habits(id) ON DELETE SET NULL
                                 );
@@ -108,6 +164,12 @@ pub fn run() {
                                 CREATE INDEX IF NOT EXISTS idx_day_notes_date ON day_notes(date);
                                 CREATE INDEX IF NOT EXISTS idx_focus_sessions_started ON focus_sessions(started_at);
                                 CREATE INDEX IF NOT EXISTS idx_vacation_habit ON vacation_periods(habit_id);
+                                CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+                                CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_id);
+                                CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_date);
+                                CREATE INDEX IF NOT EXISTS idx_homework_due ON homework(due_date);
+                                CREATE INDEX IF NOT EXISTS idx_homework_subject ON homework(subject_id);
+                                CREATE INDEX IF NOT EXISTS idx_notes_pinned ON notes(pinned);
                             "#,
                             kind: MigrationKind::Up,
                         },
@@ -118,8 +180,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::hash_password,
             commands::verify_password,
-            commands::get_app_settings,
-            commands::save_app_setting,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
