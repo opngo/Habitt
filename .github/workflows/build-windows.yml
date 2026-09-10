@@ -1,0 +1,80 @@
+name: Build Windows (Portable + Installer)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build the app (NSIS installer + portable)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: 'Habitt. v__VERSION__'
+          releaseBody: |
+            ## Habitt. v__VERSION__
+            
+            ### Windows Downloads
+            - **Habitt-Setup.exe** — Installer (recommended)
+            - **Habitt_Portable.exe** — Portable (no installation required)
+            
+            ### Installation
+            - **Installer:** Run the .exe and follow the setup wizard
+            - **Portable:** Extract and run directly, no install needed
+          releaseDraft: true
+          prerelease: false
+          args: '--bundles nsis'
+
+      - name: Build portable executable
+        run: |
+          # Create portable build by copying the NSIS output without the installer wrapper
+          $nsisPath = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis" -Filter "*.exe" | Select-Object -First 1
+          if ($nsisPath) {
+            New-Item -ItemType Directory -Force -Path "portable"
+            Copy-Item $nsisPath.FullName "portable/Habitt_Portable.exe"
+          }
+        shell: pwsh
+
+      - name: Upload portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Habitt-Windows-Portable
+          path: portable/
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Habitt-Windows-Installer
+          path: src-tauri/target/release/bundle/nsis/*.exe
