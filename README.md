@@ -1,39 +1,57 @@
 # Habitt.
 
-A beautiful, privacy-first desktop habit tracker with heatmaps, journaling, and streaks.
+A beautiful, privacy-first desktop habit tracker built with React, Reshaped UI, Lucide Icons, and Tauri.
 
 ## Features
 
+### Core
 - **📊 Visual Heatmaps** — GitHub-style contribution grids showing your habit consistency over the year
-- **🔥 Streak Tracking** — Current and longest streaks for each habit
-- **📝 Daily Journal** — Reflect on your day with mood tracking, gratitude, and free-form writing
-- **🎨 Customizable Habits** — Icons, colors, categories, and flexible scheduling
-- **📈 Detailed Stats** — Completion rates, history, and per-habit analytics
-- **🔒 Optional Password** — Protect your habits and journal with a password
-- **🌙 Dark Mode** — Easy on the eyes, day or night
-- **💾 Local Storage** — All data stays on your device. No cloud, no tracking, no ads
+- **🔥 Streak Tracking** — Current and longest streaks per habit with visual progress bars
+- **📝 Daily Journal** — Mood, energy, sleep hours, gratitude, and free-form writing
+- **🎨 Customizable Habits** — Icons, colors, categories, difficulty levels, and flexible scheduling
+- **📈 Detailed Statistics** — Completion rates, day-of-week patterns, monthly trends, category breakdowns
+- **🔒 Optional Password** — Protect your habits and journal with SHA-256 hashing
+- **🌙 Dark Mode** — Automatic light/dark theme support
+- **💾 Local SQLite Storage** — All data stays on your device. No cloud, no tracking, no ads
 - **📤 Export/Import** — Backup your data as JSON
 
-## Screenshots
+### Advanced
+- **🏆 Gamification** — XP system, levels, 20+ unlockable achievements
+- **⚡ Quick Check-in Mode** — One-screen rapid habit logging
+- **🔍 Command Palette** — Ctrl+K for instant navigation and actions
+- **🎯 Habit Templates** — 40+ pre-built templates to get started fast
+- **🎉 Confetti Celebrations** — Animations on streak milestones
+- **📊 Streak Leaderboard** — Rank your habits by current streak
+- **😊 Mood Correlation** — Track mood alongside habits to find patterns
+- **📅 Day-of-Week Patterns** — See which days you're most productive
+- **📈 Monthly Trend Charts** — Bar chart visualization per month
+- **🔔 Toast Notifications** — Feedback on every action
+- **⌨️ Keyboard Shortcuts** — Ctrl+N for new habit, Ctrl+K for commands, Esc to close
 
-The app features a clean dashboard with habit cards, a year-at-a-glance heatmap, individual habit pages with detailed statistics, and a built-in journal for daily reflection.
+### UI/UX
+- **Reshaped UI** — Professional 60+ component library
+- **Lucide Icons** — Beautiful, consistent icon set
+- **Smooth Animations** — Fade-in, slide-up, scale-in, stagger effects
+- **Hover Effects** — Cards lift with shadows on hover
+- **Gradient Accents** — Beautiful color gradients throughout
+- **Responsive Grid** — Adapts to window size
 
 ## Download
 
 ### Windows
-- **Installer:** Download `Habitt-Setup.exe` and run the setup wizard
-- **Portable:** Download `Habitt_Portable.exe` — no installation required
+- **Installer:** `Habitt-Setup.exe` (NSIS installer)
+- **Portable:** `Habitt_Portable.exe` (no installation required)
 
 ### Linux
-- **Debian/Ubuntu:** Download `habitt_amd64.deb` and install with `sudo dpkg -i habitt_amd64.deb`
-- **AppImage (Portable):** Download `Habitt.AppImage`, make executable with `chmod +x`, and run
+- **Debian/Ubuntu:** `habitt_amd64.deb`
+- **AppImage (Portable):** `Habitt.AppImage`
 
 ## Development
 
 ### Prerequisites
 - [Node.js](https://nodejs.org/) (v18+)
 - [Rust](https://www.rust-lang.org/tools/install)
-- System dependencies for Tauri (see [Tauri docs](https://tauri.app/start/prerequisites/))
+- System dependencies for [Tauri](https://tauri.app/start/prerequisites/)
 
 ### Setup
 ```bash
@@ -46,50 +64,53 @@ npm run tauri dev
 npm run tauri build
 ```
 
-Built artifacts will be in `src-tauri/target/release/bundle/`.
-
 ## Tech Stack
 
-- **Frontend:** Svelte 5 + Vite
+- **Frontend:** React 18 + Vite
+- **UI Library:** [Reshaped](https://reshaped.so) (60+ components)
+- **Icons:** [Lucide](https://lucide.dev)
+- **State:** Zustand
+- **Animations:** CSS animations + canvas-confetti
 - **Backend:** Tauri 2 (Rust)
 - **Database:** SQLite (local, via tauri-plugin-sql)
+- **Dates:** date-fns
 - **Build:** GitHub Actions (Windows + Linux)
 
 ## Project Structure
 
 ```
 Habitt./
-├── src/                      # Frontend (Svelte)
-│   ├── App.svelte            # Main app with routing
-│   ├── main.js               # Entry point
-│   ├── styles/               # Global styles
-│   └── lib/
-│       ├── components/       # Reusable components
-│       │   ├── Sidebar.svelte
-│       │   ├── Heatmap.svelte
-│       │   ├── HabitCard.svelte
-│       │   ├── CreateHabitModal.svelte
-│       │   └── PasswordGate.svelte
-│       ├── views/            # Page views
-│       │   ├── Dashboard.svelte
-│       │   ├── HabitPage.svelte
-│       │   ├── Journal.svelte
-│       │   ├── SettingsView.svelte
-│       │   └── Tutorial.svelte
-│       ├── stores.js         # Svelte stores
-│       ├── db.js             # Database operations
-│       └── utils.js          # Utility functions
-├── src-tauri/                # Backend (Rust)
-│   ├── src/
-│   │   ├── main.rs
-│   │   ├── lib.rs
-│   │   └── commands.rs
-│   ├── tauri.conf.json
-│   └── Cargo.toml
-├── .github/workflows/        # CI/CD
-│   ├── build-windows.yml
-│   ├── build-linux.yml
-│   └── release.yml
+├── src/                           # Frontend (React)
+│   ├── App.jsx                    # Main app shell
+│   ├── main.jsx                   # Entry point
+│   ├── styles.css                 # Global styles + animations
+│   ├── lib/
+│   │   ├── store.js               # Zustand global state
+│   │   ├── db.js                  # Database operations
+│   │   ├── utils.js               # Date helpers, streak calc
+│   │   └── constants.js           # Templates, achievements, colors
+│   └── components/
+│       ├── Layout/Sidebar.jsx     # Navigation sidebar
+│       ├── Heatmap/YearHeatmap.jsx # GitHub-style heatmap
+│       ├── Habits/
+│       │   ├── Dashboard.jsx      # Main dashboard
+│       │   ├── HabitCard.jsx      # Habit card with mini-heatmap
+│       │   ├── HabitDetailPage.jsx # Full habit analytics
+│       │   ├── CreateHabitModal.jsx # Create/edit form
+│       │   └── QuickCheckin.jsx   # Rapid check-in mode
+│       ├── Journal/JournalPage.jsx # Journal with mood/energy
+│       ├── Stats/StatsDashboard.jsx # Analytics + achievements
+│       ├── Settings/SettingsPage.jsx
+│       ├── Tutorial/Tutorial.jsx  # 6-step onboarding
+│       └── Shared/
+│           ├── PasswordGate.jsx   # Login screen
+│           ├── CommandPalette.jsx # Ctrl+K palette
+│           └── ToastContainer.jsx # Notifications
+├── src-tauri/                     # Backend (Rust)
+├── .github/workflows/             # CI/CD
+│   ├── build-windows.yml          # Portable + NSIS installer
+│   ├── build-linux.yml            # AppImage + .deb installer
+│   └── release.yml                # Trigger both on tags
 └── package.json
 ```
 

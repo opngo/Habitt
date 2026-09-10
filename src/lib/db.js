@@ -5,201 +5,156 @@ let db;
 
 export async function getDb() {
   if (!db) {
-    db = await Database.load('sqlite:habitt.db');
+    try {
+      db = await Database.load('sqlite:habitt.db');
+    } catch (e) {
+      console.warn('DB not available (web mode):', e);
+      return null;
+    }
   }
   return db;
 }
 
-// Habits
+// ── Habits ──
 export async function createHabit(habit) {
-  const db = await getDb();
+  const database = await getDb();
+  if (!database) return { ...habit, id: crypto.randomUUID() };
   const id = crypto.randomUUID();
-  await db.execute(
-    `INSERT INTO habits (id, name, description, icon, color, category, frequency, target_count, reminder_enabled, reminder_time)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-    [id, habit.name, habit.description || '', habit.icon || '✨', habit.color || '#10b981',
+  await database.execute(
+    `INSERT INTO habits (id, name, description, icon, color, category, frequency, target_count, reminder_enabled, reminder_time, custom_days, difficulty, notes_template)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+    [id, habit.name, habit.description || '', habit.icon || '✨', habit.color || '#22c55e',
      habit.category || 'General', habit.frequency || 'daily', habit.target_count || 1,
-     habit.reminder_enabled ? 1 : 0, habit.reminder_time || '']
+     habit.reminder_enabled ? 1 : 0, habit.reminder_time || '', habit.custom_days || '',
+     habit.difficulty || 'medium', habit.notes_template || '']
   );
   return { ...habit, id };
 }
 
 export async function getHabits() {
-  const db = await getDb();
-  return await db.select('SELECT * FROM habits ORDER BY sort_order ASC, created_at DESC');
+  const database = await getDb();
+  if (!database) return [];
+  return await database.select('SELECT * FROM habits ORDER BY sort_order ASC, created_at DESC');
 }
 
 export async function updateHabit(id, updates) {
-  const db = await getDb();
-  const fields = [];
-  const values = [];
-  let paramIndex = 1;
-  
+  const database = await getDb();
+  if (!database) return;
+  const fields = []; const values = []; let pi = 1;
   Object.entries(updates).forEach(([key, value]) => {
-    if (key !== 'id') {
-      fields.push(`${key} = $${paramIndex}`);
-      values.push(value);
-      paramIndex++;
-    }
+    if (key !== 'id') { fields.push(`${key} = $${pi}`); values.push(value); pi++; }
   });
-  
   values.push(id);
-  await db.execute(
-    `UPDATE habits SET ${fields.join(', ')} WHERE id = $${paramIndex}`,
-    values
-  );
+  await database.execute(`UPDATE habits SET ${fields.join(', ')} WHERE id = $${pi}`, values);
 }
 
 export async function deleteHabit(id) {
-  const db = await getDb();
-  await db.execute('DELETE FROM completions WHERE habit_id = $1', [id]);
-  await db.execute('DELETE FROM habits WHERE id = $1', [id]);
+  const database = await getDb();
+  if (!database) return;
+  await database.execute('DELETE FROM completions WHERE habit_id = $1', [id]);
+  await database.execute('DELETE FROM habits WHERE id = $1', [id]);
 }
 
-export async function archiveHabit(id) {
-  await updateHabit(id, { archived: 1 });
-}
-
-export async function unarchiveHabit(id) {
-  await updateHabit(id, { archived: 0 });
-}
-
-// Completions
-export async function logCompletion(habitId, date, count = 1, note = '') {
-  const db = await getDb();
-  const id = crypto.randomUUID();
-  try {
-    await db.execute(
-      `INSERT INTO completions (id, habit_id, date, count, note) VALUES ($1, $2, $3, $4, $5)`,
-      [id, habitId, date, count, note]
-    );
-    return { id, habit_id: habitId, date, count, note };
-  } catch (e) {
-    // If unique constraint fails, update instead
-    await db.execute(
-      `UPDATE completions SET count = count + $1, note = $2 WHERE habit_id = $3 AND date = $4`,
-      [count, note, habitId, date]
-    );
-    return null;
-  }
-}
-
+// ── Completions ──
 export async function toggleCompletion(habitId, date) {
-  const db = await getDb();
-  const existing = await db.select(
-    'SELECT * FROM completions WHERE habit_id = $1 AND date = $2',
-    [habitId, date]
-  );
-  
+  const database = await getDb();
+  if (!database) return true;
+  const existing = await database.select(
+    'SELECT * FROM completions WHERE habit_id = $1 AND date = $2', [habitId, date]);
   if (existing.length > 0) {
-    await db.execute('DELETE FROM completions WHERE id = $1', [existing[0].id]);
+    await database.execute('DELETE FROM completions WHERE id = $1', [existing[0].id]);
     return false;
   } else {
-    await logCompletion(habitId, date);
+    const id = crypto.randomUUID();
+    await database.execute(
+      'INSERT INTO completions (id, habit_id, date, count, note) VALUES ($1, $2, $3, $4, $5)',
+      [id, habitId, date, 1, '']);
     return true;
   }
 }
 
-export async function getCompletions(startDate, endDate) {
-  const db = await getDb();
-  if (startDate && endDate) {
-    return await db.select(
-      'SELECT * FROM completions WHERE date >= $1 AND date <= $2 ORDER BY date DESC',
-      [startDate, endDate]
-    );
+export async function logCompletionWithNote(habitId, date, count, note) {
+  const database = await getDb();
+  if (!database) return;
+  const id = crypto.randomUUID();
+  try {
+    await database.execute(
+      'INSERT INTO completions (id, habit_id, date, count, note) VALUES ($1, $2, $3, $4, $5)',
+      [id, habitId, date, count, note]);
+  } catch {
+    await database.execute(
+      'UPDATE completions SET count = $1, note = $2 WHERE habit_id = $3 AND date = $4',
+      [count, note, habitId, date]);
   }
-  return await db.select('SELECT * FROM completions ORDER BY date DESC');
 }
 
-export async function getHabitCompletions(habitId) {
-  const db = await getDb();
-  return await db.select(
-    'SELECT * FROM completions WHERE habit_id = $1 ORDER BY date DESC',
-    [habitId]
-  );
+export async function getCompletions() {
+  const database = await getDb();
+  if (!database) return [];
+  return await database.select('SELECT * FROM completions ORDER BY date DESC');
 }
 
-// Journal
+// ── Journal ──
 export async function saveJournalEntry(date, entry) {
-  const db = await getDb();
-  const existing = await db.select(
-    'SELECT * FROM journal_entries WHERE date = $1',
-    [date]
-  );
-  
+  const database = await getDb();
+  if (!database) return { ...entry, date };
+  const existing = await database.select('SELECT * FROM journal_entries WHERE date = $1', [date]);
   if (existing.length > 0) {
-    await db.execute(
-      `UPDATE journal_entries SET mood = $1, content = $2, gratitude = $3, updated_at = datetime('now') WHERE date = $4`,
-      [entry.mood || 3, entry.content || '', entry.gratitude || '', date]
-    );
-    return { ...existing[0], ...entry, date };
+    await database.execute(
+      `UPDATE journal_entries SET mood = $1, content = $2, gratitude = $3, sleep_hours = $4, energy = $5, tags = $6, updated_at = datetime('now') WHERE date = $7`,
+      [entry.mood || 3, entry.content || '', entry.gratitude || '', entry.sleep_hours || null, entry.energy || 3, entry.tags || '', date]);
   } else {
     const id = crypto.randomUUID();
-    await db.execute(
-      `INSERT INTO journal_entries (id, date, mood, content, gratitude) VALUES ($1, $2, $3, $4, $5)`,
-      [id, date, entry.mood || 3, entry.content || '', entry.gratitude || '']
-    );
-    return { id, date, ...entry };
+    await database.execute(
+      'INSERT INTO journal_entries (id, date, mood, content, gratitude, sleep_hours, energy, tags) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+      [id, date, entry.mood || 3, entry.content || '', entry.gratitude || '', entry.sleep_hours || null, entry.energy || 3, entry.tags || '']);
   }
+  return { ...entry, date };
 }
 
-export async function getJournalEntry(date) {
-  const db = await getDb();
-  const entries = await db.select(
-    'SELECT * FROM journal_entries WHERE date = $1',
-    [date]
-  );
-  return entries[0] || null;
+export async function getJournalEntries() {
+  const database = await getDb();
+  if (!database) return [];
+  return await database.select('SELECT * FROM journal_entries ORDER BY date DESC');
 }
 
-export async function getJournalEntries(startDate, endDate) {
-  const db = await getDb();
-  if (startDate && endDate) {
-    return await db.select(
-      'SELECT * FROM journal_entries WHERE date >= $1 AND date <= $2 ORDER BY date DESC',
-      [startDate, endDate]
-    );
-  }
-  return await db.select('SELECT * FROM journal_entries ORDER BY date DESC');
-}
-
-// Settings
+// ── Settings ──
 export async function getSetting(key) {
-  const db = await getDb();
-  const result = await db.select(
-    'SELECT value FROM settings WHERE key = $1',
-    [key]
-  );
-  return result[0]?.value || null;
+  const database = await getDb();
+  if (!database) return null;
+  const r = await database.select('SELECT value FROM settings WHERE key = $1', [key]);
+  return r[0]?.value || null;
 }
 
 export async function saveSetting(key, value) {
-  const db = await getDb();
-  await db.execute(
+  const database = await getDb();
+  if (!database) return;
+  await database.execute(
     `INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT(key) DO UPDATE SET value = $2`,
-    [key, value]
-  );
+    [key, String(value)]);
 }
 
 export async function getAllSettings() {
-  const db = await getDb();
-  const result = await db.select('SELECT * FROM settings');
+  const database = await getDb();
+  if (!database) return {};
+  const result = await database.select('SELECT * FROM settings');
   const settings = {};
-  result.forEach(s => {
-    try {
-      settings[s.key] = JSON.parse(s.value);
-    } catch {
-      settings[s.key] = s.value;
-    }
-  });
+  result.forEach(s => { try { settings[s.key] = JSON.parse(s.value); } catch { settings[s.key] = s.value; } });
   return settings;
 }
 
-// Password utilities
+// ── Password ──
 export async function hashPassword(password) {
-  return await invoke('hash_password', { password });
+  try { return await invoke('hash_password', { password }); }
+  catch {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
 }
 
 export async function verifyPassword(password, hash) {
-  return await invoke('verify_password', { password, hash });
+  try { return await invoke('verify_password', { password, hash }); }
+  catch { const computed = await hashPassword(password); return computed === hash; }
 }

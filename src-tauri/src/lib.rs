@@ -24,12 +24,15 @@ pub fn run() {
                                     name TEXT NOT NULL,
                                     description TEXT DEFAULT '',
                                     icon TEXT DEFAULT '✨',
-                                    color TEXT DEFAULT '#10b981',
+                                    color TEXT DEFAULT '#22c55e',
                                     category TEXT DEFAULT 'General',
                                     frequency TEXT DEFAULT 'daily',
                                     target_count INTEGER DEFAULT 1,
                                     reminder_enabled INTEGER DEFAULT 0,
                                     reminder_time TEXT DEFAULT '',
+                                    custom_days TEXT DEFAULT '',
+                                    difficulty TEXT DEFAULT 'medium',
+                                    notes_template TEXT DEFAULT '',
                                     created_at TEXT DEFAULT (datetime('now')),
                                     archived INTEGER DEFAULT 0,
                                     sort_order INTEGER DEFAULT 0
@@ -52,6 +55,9 @@ pub fn run() {
                                     mood INTEGER DEFAULT 3,
                                     content TEXT DEFAULT '',
                                     gratitude TEXT DEFAULT '',
+                                    sleep_hours REAL DEFAULT NULL,
+                                    energy INTEGER DEFAULT 3,
+                                    tags TEXT DEFAULT '',
                                     created_at TEXT DEFAULT (datetime('now')),
                                     updated_at TEXT DEFAULT (datetime('now'))
                                 );

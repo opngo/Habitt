@@ -1,146 +1,124 @@
-export function formatDate(date) {
-  return new Date(date).toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
-}
+import {
+  format, startOfYear, endOfYear, eachDayOfInterval, subDays, addDays,
+  isSameDay, isToday, isYesterday, startOfWeek, endOfWeek, getDay,
+  differenceInDays, parseISO, isWithinInterval, startOfMonth, endOfMonth
+} from 'date-fns';
 
-export function formatShortDate(date) {
-  return new Date(date).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric'
-  });
-}
-
-export function getToday() {
-  return new Date().toISOString().split('T')[0];
-}
-
-export function getDateRange(startDate, endDate) {
-  const dates = [];
-  let current = new Date(startDate);
-  const end = new Date(endDate);
-  
-  while (current <= end) {
-    dates.push(current.toISOString().split('T')[0]);
-    current.setDate(current.getDate() + 1);
-  }
-  
-  return dates;
-}
-
-export function getYearDates(year) {
-  const start = new Date(year, 0, 1);
-  const end = new Date(year, 11, 31);
-  return getDateRange(start, end);
-}
+export const formatDate = (d) => format(typeof d === 'string' ? parseISO(d) : d, 'yyyy-MM-dd');
+export const formatDisplay = (d) => format(typeof d === 'string' ? parseISO(d) : d, 'EEEE, MMMM d, yyyy');
+export const formatShort = (d) => format(typeof d === 'string' ? parseISO(d) : d, 'MMM d');
+export const formatMonthYear = (d) => format(typeof d === 'string' ? parseISO(d) : d, 'MMMM yyyy');
+export const getToday = () => format(new Date(), 'yyyy-MM-dd');
+export const getYear = () => new Date().getFullYear();
+export const toStr = (d) => format(d, 'yyyy-MM-dd');
 
 export function getLast365Days() {
   const end = new Date();
-  const start = new Date();
-  start.setDate(start.getDate() - 364);
-  return getDateRange(start, end);
+  const start = subDays(end, 364);
+  return eachDayOfInterval({ start, end });
 }
 
-export function getWeekDates(weekStart) {
-  const dates = [];
-  const start = new Date(weekStart);
-  
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(start);
-    date.setDate(date.getDate() + i);
-    dates.push(date.toISOString().split('T')[0]);
-  }
-  
-  return dates;
+export function getLast7Days() {
+  const end = new Date();
+  return eachDayOfInterval({ start: subDays(end, 6), end });
 }
 
-export function isToday(date) {
-  return date === getToday();
+export function getLast30Days() {
+  const end = new Date();
+  return eachDayOfInterval({ start: subDays(end, 29), end });
 }
 
-export function isYesterday(date) {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  return date === yesterday.toISOString().split('T')[0];
+export function getYearDays(year) {
+  return eachDayOfInterval({ start: startOfYear(new Date(year, 0)), end: endOfYear(new Date(year, 0)) });
 }
 
-export function getDayName(date) {
-  return new Date(date).toLocaleDateString('en-US', { weekday: 'long' });
+export function getWeeksFromDays(days) {
+  const weeks = [];
+  let currentWeek = [];
+  const firstDay = getDay(days[0]);
+  for (let i = 0; i < firstDay; i++) currentWeek.push(null);
+  days.forEach((d) => {
+    currentWeek.push(d);
+    if (currentWeek.length === 7) { weeks.push(currentWeek); currentWeek = []; }
+  });
+  if (currentWeek.length > 0) weeks.push(currentWeek);
+  return weeks;
 }
 
-export function getMonthName(date) {
-  return new Date(date).toLocaleDateString('en-US', { month: 'long' });
+export function getCompletionIntensity(count) {
+  if (count === 0) return 0;
+  if (count <= 1) return 1;
+  if (count <= 3) return 2;
+  if (count <= 5) return 3;
+  return 4;
 }
 
-export function calculateCompletionRate(completions, startDate, endDate) {
-  const dates = getDateRange(startDate, endDate);
-  const completedDates = new Set(completions.map(c => c.date));
-  const completed = dates.filter(d => completedDates.has(d)).length;
-  return Math.round((completed / dates.length) * 100);
-}
-
-export function getLongestStreak(completions) {
-  if (completions.length === 0) return 0;
-  
-  const sortedDates = completions.map(c => c.date).sort();
-  let maxStreak = 1;
-  let currentStreak = 1;
-  
-  for (let i = 1; i < sortedDates.length; i++) {
-    const prev = new Date(sortedDates[i - 1]);
-    const curr = new Date(sortedDates[i]);
-    const diffDays = Math.floor((curr - prev) / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 1) {
-      currentStreak++;
-      maxStreak = Math.max(maxStreak, currentStreak);
-    } else if (diffDays > 1) {
-      currentStreak = 1;
-    }
-  }
-  
-  return maxStreak;
-}
-
-export function getCurrentStreak(completions) {
-  if (completions.length === 0) return 0;
-  
-  const sortedDates = completions.map(c => c.date).sort().reverse();
+export function getCurrentStreak(habitCompletions) {
+  if (!habitCompletions.length) return 0;
+  const dates = new Set(habitCompletions.map(c => c.date));
   let streak = 0;
-  let currentDate = new Date();
-  
-  for (let i = 0; i < 365; i++) {
-    const dateStr = currentDate.toISOString().split('T')[0];
-    if (sortedDates.includes(dateStr)) {
-      streak++;
-      currentDate.setDate(currentDate.getDate() - 1);
-    } else if (i === 0) {
-      // Allow today to be incomplete
-      currentDate.setDate(currentDate.getDate() - 1);
-    } else {
-      break;
-    }
+  let d = new Date();
+  for (let i = 0; i < 1000; i++) {
+    const ds = toStr(d);
+    if (dates.has(ds)) { streak++; d = subDays(d, 1); }
+    else if (i === 0) { d = subDays(d, 1); }
+    else break;
   }
-  
   return streak;
 }
 
-export const HABIT_ICONS = [
-  '💪', '🏃', '🧘', '📚', '💧', '🥗', '😴', '🎯',
-  '✍️', '🎨', '🎵', '💻', '🌱', '☀️', '🌙', '❤️',
-  '🧠', '🎓', '💼', '🏠', '🚶', '🚴', '🏊', '⚡',
-  '🔥', '⭐', '✨', '🌟', '🎉', '🎊', '🏆', '🎖️'
-];
+export function getLongestStreak(habitCompletions) {
+  if (!habitCompletions.length) return 0;
+  const sorted = habitCompletions.map(c => c.date).sort();
+  let max = 1, cur = 1;
+  for (let i = 1; i < sorted.length; i++) {
+    const diff = differenceInDays(parseISO(sorted[i]), parseISO(sorted[i-1]));
+    if (diff === 1) { cur++; max = Math.max(max, cur); }
+    else if (diff > 1) cur = 1;
+  }
+  return max;
+}
 
-export const HABIT_COLORS = [
-  '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b',
-  '#ef4444', '#06b6d4', '#84cc16', '#f97316', '#6366f1'
-];
+export function getCompletionRate(completions, days) {
+  if (!days.length) return 0;
+  const set = new Set(completions.map(c => c.date));
+  const done = days.filter(d => set.has(toStr(d))).length;
+  return Math.round((done / days.length) * 100);
+}
 
-export const CATEGORIES = [
-  'Health', 'Fitness', 'Mindfulness', 'Learning', 'Productivity',
-  'Social', 'Creative', 'Finance', 'General'
-];
+export function getDayOfWeekStats(completions) {
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const counts = [0,0,0,0,0,0,0];
+  completions.forEach(c => { counts[getDay(parseISO(c.date))]++; });
+  return days.map((name, i) => ({ name, count: counts[i] }));
+}
+
+export function getBestDay(completions) {
+  const dayMap = {};
+  completions.forEach(c => {
+    if (!dayMap[c.date]) dayMap[c.date] = 0;
+    dayMap[c.date]++;
+  });
+  let best = null, max = 0;
+  Object.entries(dayMap).forEach(([date, count]) => {
+    if (count > max) { max = count; best = date; }
+  });
+  return { date: best, count: max };
+}
+
+export function getMonthlyData(completions, year) {
+  const months = [];
+  for (let m = 0; m < 12; m++) {
+    const start = startOfMonth(new Date(year, m));
+    const end = endOfMonth(new Date(year, m));
+    const days = eachDayOfInterval({ start, end });
+    const rate = getCompletionRate(completions, days);
+    months.push({ month: format(start, 'MMM'), rate, count: completions.filter(c => {
+      const d = parseISO(c.date);
+      return d >= start && d <= end;
+    }).length });
+  }
+  return months;
+}
+
+export { isToday, isYesterday, isSameDay, subDays, addDays, parseISO, differenceInDays, format };
