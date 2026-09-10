@@ -1,37 +1,37 @@
 import React, { useState } from 'react';
 import { View, Text, Button, Icon } from 'reshaped';
-import { ChevronRight, ChevronLeft, Rocket, Sparkles } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Rocket, Sparkles, Sprout, Plus, CheckCircle, BarChart3, PenLine, Trophy } from 'lucide-react';
 import { useStore } from '../../lib/store';
 import { saveSetting } from '../../lib/db';
 
 const STEPS = [
   {
-    icon: '🌱', title: 'Welcome to Habitt.',
+    Icon: Sprout, title: 'Welcome to Habitt.',
     desc: 'Your personal habit tracker designed to help you build lasting habits with visual feedback, streaks, and daily journaling.',
     items: ['Track habits with one click', 'GitHub-style heatmaps', 'Daily journaling & mood tracking', 'Gamification with XP & achievements']
   },
   {
-    icon: '➕', title: 'Create Your First Habit',
+    Icon: Plus, title: 'Create Your First Habit',
     desc: 'Add habits you want to build. Give each one a name, icon, color, and category. Choose from 40+ templates or create your own.',
     items: ['Choose an icon and color', 'Set a category like Health or Learning', 'Pick difficulty: easy, medium, or hard', 'Set frequency and daily targets']
   },
   {
-    icon: '✅', title: 'Check In Daily',
+    Icon: CheckCircle, title: 'Check In Daily',
     desc: 'Each day, mark your habits as done. Watch the heatmap fill up and your streaks grow! Use Quick Check-in mode for fast logging.',
     items: ['Click "Mark Done" on any habit card', 'Heatmap shows your yearly activity', 'Streak counter tracks consecutive days', 'Earn XP for every completion']
   },
   {
-    icon: '📊', title: 'Explore Your Stats',
+    Icon: BarChart3, title: 'Explore Your Stats',
     desc: 'Dive into detailed analytics: streak leaderboards, day-of-week patterns, monthly trends, and category breakdowns.',
     items: ['Current & longest streaks per habit', '30-day completion rate', 'Day-of-week patterns', 'Mood correlation with habits']
   },
   {
-    icon: '📝', title: 'Journal Your Journey',
+    Icon: PenLine, title: 'Journal Your Journey',
     desc: 'Reflect on your day with the built-in journal. Track mood, energy, sleep hours, and write about your progress.',
     items: ['Rate daily mood with 5 emoji levels', 'Track energy level and sleep', 'Write thoughts and gratitude', 'Browse past entries anytime']
   },
   {
-    icon: '🏆', title: 'Earn Achievements',
+    Icon: Trophy, title: 'Earn Achievements',
     desc: 'Unlock badges as you build habits. Get XP for completions, level up, and celebrate milestones with confetti!',
     items: ['20+ achievements to unlock', 'XP system with levels', 'Confetti on streak milestones', 'Optional password protection']
   },
@@ -72,7 +72,7 @@ export default function Tutorial() {
 
         {/* Content */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>{STEPS[step].icon}</div>
+          <div style={{ width: 64, height: 64, borderRadius: 16, background: "var(--rs-color-background-primary-faded)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "1rem" }}>{(() => { const Icon = STEPS[step].Icon; return <Icon size={28} color="var(--rs-color-foreground-primary-default)" />; })()}</div>
           <Text variant="title-1" weight="bold">{STEPS[step].title}</Text>
           <Text variant="body-2" color="neutral-faded" marginTop={2} style={{ maxWidth: 440, margin: '0.5rem auto 0' }}>
             {STEPS[step].desc}
@@ -87,7 +87,7 @@ export default function Tutorial() {
                 padding: '8px 12px', borderRadius: 8,
                 background: 'var(--rs-color-background-neutral-faded)',
               }}>
-                <span style={{ color: 'var(--rs-color-foreground-primary-default)', fontWeight: 700 }}>✓</span>
+                <span style={{ color: 'var(--rs-color-foreground-primary-default)', fontWeight: 700 }}></span>
                 <Text variant="body-3">{item}</Text>
               </div>
             ))}

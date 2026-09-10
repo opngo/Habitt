@@ -72,7 +72,7 @@ export const useStore = create((set, get) => ({
     if (!get().achievements.includes(id)) {
       set((s) => ({ achievements: [...s.achievements, id] }));
       get().addXp(50);
-      get().addToast({ type: 'success', message: `🏆 Achievement unlocked! +50 XP` });
+      get().addToast({ type: 'success', message: `Achievement unlocked! +50 XP` });
     }
   },
 }));

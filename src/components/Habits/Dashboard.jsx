@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, Button, Icon, Badge, Divider } from 'reshaped';
-import { Plus, Zap, Search, LayoutGrid, List, Filter } from 'lucide-react';
+import { Plus, Zap, Search, Sprout, Quote } from 'lucide-react';
 import { useStore } from '../../lib/store';
 import { getToday, getLast365Days, toStr } from '../../lib/utils';
 import { DAILY_QUOTES } from '../../lib/constants';
@@ -40,7 +40,7 @@ export default function Dashboard({ refreshData }) {
       <View direction="row" align="center" gap={4} paddingBottom={6} style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <View>
           <Text variant="title-1" weight="bold">
-            Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'} 👋
+            Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'} 
           </Text>
           <Text variant="body-2" color="neutral-faded">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
@@ -71,7 +71,7 @@ export default function Dashboard({ refreshData }) {
         borderRadius: 12, border: '1px solid rgba(34,197,94,0.15)'
       }}>
         <Text variant="body-3" color="neutral-faded" style={{ fontStyle: 'italic' }}>
-          ✨ {quote}
+          <Quote size={14} style={{ marginRight: 8, flexShrink: 0 }} /> {quote}
         </Text>
       </View>
 
@@ -156,7 +156,7 @@ export default function Dashboard({ refreshData }) {
           borderRadius: 16, border: '2px dashed var(--rs-color-border-neutral-faded)',
           textAlign: 'center'
         }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🌱</div>
+          <Sprout size={48} color="#22c55e" style={{ marginBottom: '1rem' }} />
           <Text variant="title-3" weight="bold" marginBottom={2}>
             {activeHabits.length === 0 ? 'Start your habit journey' : 'No habits match'}
           </Text>

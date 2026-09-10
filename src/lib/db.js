@@ -15,7 +15,7 @@ export async function getDb() {
   return db;
 }
 
-// ── Habits ──
+//  Habits 
 export async function createHabit(habit) {
   const database = await getDb();
   if (!database) return { ...habit, id: crypto.randomUUID() };
@@ -23,7 +23,7 @@ export async function createHabit(habit) {
   await database.execute(
     `INSERT INTO habits (id, name, description, icon, color, category, frequency, target_count, reminder_enabled, reminder_time, custom_days, difficulty, notes_template)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-    [id, habit.name, habit.description || '', habit.icon || '✨', habit.color || '#22c55e',
+    [id, habit.name, habit.description || '', habit.icon || '', habit.color || '#22c55e',
      habit.category || 'General', habit.frequency || 'daily', habit.target_count || 1,
      habit.reminder_enabled ? 1 : 0, habit.reminder_time || '', habit.custom_days || '',
      habit.difficulty || 'medium', habit.notes_template || '']
@@ -55,7 +55,7 @@ export async function deleteHabit(id) {
   await database.execute('DELETE FROM habits WHERE id = $1', [id]);
 }
 
-// ── Completions ──
+//  Completions 
 export async function toggleCompletion(habitId, date) {
   const database = await getDb();
   if (!database) return true;
@@ -94,7 +94,7 @@ export async function getCompletions() {
   return await database.select('SELECT * FROM completions ORDER BY date DESC');
 }
 
-// ── Journal ──
+//  Journal 
 export async function saveJournalEntry(date, entry) {
   const database = await getDb();
   if (!database) return { ...entry, date };
@@ -118,7 +118,7 @@ export async function getJournalEntries() {
   return await database.select('SELECT * FROM journal_entries ORDER BY date DESC');
 }
 
-// ── Settings ──
+//  Settings 
 export async function getSetting(key) {
   const database = await getDb();
   if (!database) return null;
@@ -143,7 +143,7 @@ export async function getAllSettings() {
   return settings;
 }
 
-// ── Password ──
+//  Password 
 export async function hashPassword(password) {
   try { return await invoke('hash_password', { password }); }
   catch {

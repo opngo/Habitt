@@ -1,8 +1,10 @@
 import React, { useEffect, useCallback } from 'react';
 import { Reshaped, Theme } from 'reshaped';
 import 'reshaped/themes/slate/theme.css';
+import { Sprout } from 'lucide-react';
 import { useStore } from './lib/store';
 import { getHabits, getCompletions, getJournalEntries, getAllSettings, getSetting } from './lib/db';
+import Titlebar from './components/Layout/Titlebar';
 import Sidebar from './components/Layout/Sidebar';
 import Dashboard from './components/Habits/Dashboard';
 import HabitDetailPage from './components/Habits/HabitDetailPage';
@@ -71,9 +73,10 @@ export default function App() {
 
   if (loading) {
     return (
-      <Reshaped theme="slate" colorMode={colorMode}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', flexDirection:'column', gap:'1rem' }}>
-          <div style={{ fontSize:'3rem' }}>🌱</div>
+    <Reshaped theme="slate" colorMode={colorMode}>
+      <Titlebar />
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', flexDirection:'column', gap:'1rem', paddingTop: 36 }}>
+          <Sprout size={48} color="var(--rs-color-foreground-primary-default)" />
           <div style={{ fontSize:'1.25rem', fontWeight:700, color:'var(--rs-color-foreground-neutral-default)' }}>Habitt.</div>
           <div style={{ color:'var(--rs-color-foreground-neutral-faded)', fontSize:'0.875rem' }}>Loading your habits...</div>
         </div>

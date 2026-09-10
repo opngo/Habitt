@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, Button, Icon, Switch, Divider } from 'reshaped';
-import { Sun, Moon, Lock, Unlock, Download, Upload, Database, Shield, Trash2, Eye, EyeOff } from 'lucide-react';
+import { Sun, Moon, Lock, Unlock, Download, Upload, Database, Shield, Eye, EyeOff, Palette, HardDrive } from 'lucide-react';
 import { useStore } from '../../lib/store';
 import { saveSetting, getSetting, hashPassword, verifyPassword } from '../../lib/db';
 
@@ -18,7 +18,7 @@ export default function SettingsPage({ refreshData }) {
     const newMode = colorMode === 'light' ? 'dark' : 'light';
     setColorMode(newMode);
     await saveSetting('theme', newMode);
-    addToast({ type: 'info', message: `${newMode === 'dark' ? '🌙' : '☀️'} Theme changed to ${newMode}` });
+    addToast({ type: 'info', message: `Theme changed to ${newMode}` });
   }
 
   async function setPassword() {
@@ -27,9 +27,9 @@ export default function SettingsPage({ refreshData }) {
     const hash = await hashPassword(newPwd);
     await saveSetting('password_hash', hash);
     setPasswordEnabled(true);
-    setPwdMsg('✅ Password set successfully!');
+    setPwdMsg('Password set successfully!');
     setNewPwd(''); setConfirmPwd('');
-    addToast({ type: 'success', message: '🔒 Password protection enabled' });
+    addToast({ type: 'success', message: 'Password protection enabled' });
   }
 
   async function removePassword() {
@@ -41,7 +41,7 @@ export default function SettingsPage({ refreshData }) {
     setPasswordEnabled(false);
     setPwdMsg('Password removed');
     setCurrentPwd('');
-    addToast({ type: 'info', message: '🔓 Password protection removed' });
+    addToast({ type: 'info', message: ' Password protection removed' });
   }
 
   function exportData() {
@@ -57,7 +57,7 @@ export default function SettingsPage({ refreshData }) {
     a.download = `habitt-export-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    addToast({ type: 'success', message: '📤 Data exported successfully!' });
+    addToast({ type: 'success', message: 'Data exported successfully!' });
   }
 
   const inputStyle = {
@@ -80,7 +80,7 @@ export default function SettingsPage({ refreshData }) {
         background: 'var(--rs-color-background-neutral-default)',
         border: '1px solid var(--rs-color-border-neutral-faded)', borderRadius: 12,
       }}>
-        <Text variant="title-3" weight="bold" marginBottom={4}>🎨 Appearance</Text>
+        <Text variant="title-3" weight="bold" marginBottom={4}> Appearance</Text>
         <View direction="row" align="center" style={{ justifyContent: 'space-between' }}>
           <View>
             <Text variant="body-2" weight="bold">Theme</Text>
@@ -102,7 +102,7 @@ export default function SettingsPage({ refreshData }) {
         background: 'var(--rs-color-background-neutral-default)',
         border: '1px solid var(--rs-color-border-neutral-faded)', borderRadius: 12,
       }}>
-        <Text variant="title-3" weight="bold" marginBottom={2}>🔒 Password Protection</Text>
+        <Text variant="title-3" weight="bold" marginBottom={2}> Password Protection</Text>
         <Text variant="caption-1" color="neutral-faded" marginBottom={4}>
           Optionally protect your habits and journal with a password
         </Text>
@@ -110,7 +110,7 @@ export default function SettingsPage({ refreshData }) {
         {passwordEnabled ? (
           <View gap={3}>
             <View padding={3} style={{ background: 'rgba(34,197,94,0.08)', borderRadius: 8, border: '1px solid rgba(34,197,94,0.2)' }}>
-              <Text variant="body-3" color="success">✓ Password protection is enabled</Text>
+              <Text variant="body-3" color="success"> Password protection is enabled</Text>
             </View>
             <div style={{ position: 'relative' }}>
               <input type={showPwd ? 'text' : 'password'} value={currentPwd} onChange={e => setCurrentPwd(e.target.value)}
@@ -140,10 +140,10 @@ export default function SettingsPage({ refreshData }) {
         )}
         {pwdMsg && (
           <View marginTop={2} padding={2} style={{
-            background: pwdMsg.includes('✅') || pwdMsg.includes('removed') ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)',
+            background: pwdMsg.includes('') || pwdMsg.includes('removed') ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)',
             borderRadius: 6,
           }}>
-            <Text variant="caption-1" color={pwdMsg.includes('✅') || pwdMsg.includes('removed') ? 'success' : 'critical'}>
+            <Text variant="caption-1" color={pwdMsg.includes('') || pwdMsg.includes('removed') ? 'success' : 'critical'}>
               {pwdMsg}
             </Text>
           </View>
@@ -155,7 +155,7 @@ export default function SettingsPage({ refreshData }) {
         background: 'var(--rs-color-background-neutral-default)',
         border: '1px solid var(--rs-color-border-neutral-faded)', borderRadius: 12,
       }}>
-        <Text variant="title-3" weight="bold" marginBottom={4}>💾 Data Management</Text>
+        <Text variant="title-3" weight="bold" marginBottom={4}> Data Management</Text>
         <View direction="row" gap={3} marginBottom={4}>
           <Button variant="faded" color="neutral" startIcon={<Icon svg={<Download size={14} />} />} onClick={exportData}>
             Export Data
@@ -164,7 +164,7 @@ export default function SettingsPage({ refreshData }) {
             const input = document.createElement('input');
             input.type = 'file'; input.accept = '.json';
             input.onchange = async (e) => {
-              addToast({ type: 'info', message: '📥 Import feature coming soon!' });
+              addToast({ type: 'info', message: 'Import feature coming soon!' });
             };
             input.click();
           }}>

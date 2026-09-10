@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, Button, Icon, TextField } from 'reshaped';
-import { Lock, Eye, EyeOff } from 'lucide-react';
+import { Lock, Eye, EyeOff, Shield } from 'lucide-react';
 import { useStore } from '../../lib/store';
 import { getSetting, verifyPassword } from '../../lib/db';
 
@@ -44,7 +44,9 @@ export default function PasswordGate() {
           background: 'linear-gradient(135deg, rgba(99,102,241,0.1), rgba(139,92,246,0.1))',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: '2rem',
-        }}>🔒</div>
+        }}>
+          <Shield size={28} color="#8b5cf6" />
+        </div>
         <Text variant="display-2" weight="bold" style={{ color: 'var(--rs-color-foreground-primary-default)' }}>
           Habitt.
         </Text>

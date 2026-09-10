@@ -3,7 +3,7 @@ import { useStore } from '../../lib/store';
 import { View, Text, Icon, Badge, Divider } from 'reshaped';
 import {
   LayoutDashboard, BookOpen, BarChart3, Settings, HelpCircle,
-  Flame, Target, Trophy, Sparkles, Zap, ChevronRight
+  Flame, Target, Trophy, Zap, ChevronRight, Sprout
 } from 'lucide-react';
 
 const navItems = [
@@ -14,7 +14,7 @@ const navItems = [
 ];
 
 export default function Sidebar() {
-  const { currentView, setView, habits, completions, xp, level, addXp } = useStore();
+  const { currentView, setView, habits, completions, xp, level } = useStore();
   const activeHabits = habits.filter(h => !h.archived);
   const today = new Date().toISOString().split('T')[0];
   const todayDone = completions.filter(c => c.date === today).length;
@@ -28,12 +28,12 @@ export default function Sidebar() {
             width: 36, height: 36, borderRadius: 10,
             background: 'linear-gradient(135deg, #22c55e, #16a34a)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '1.25rem', boxShadow: '0 4px 12px rgba(34,197,94,0.3)'
+            color: 'white', boxShadow: '0 4px 12px rgba(34,197,94,0.3)'
           }}>
-            🌱
+            <Sprout size={18} />
           </div>
           <View>
-            <Text variant="title-3" weight="bold">Habitt.</Text>
+            <Text variant="title-3" weight="bold">Habitt</Text>
             <Text variant="caption-1" color="neutral-faded">Build better habits</Text>
           </View>
         </View>
@@ -50,7 +50,7 @@ export default function Sidebar() {
                 onClick={() => setView(item.id)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '0.75rem',
-                  width: '100%', padding: '0.625rem 0.75rem', borderRadius: '8px',
+                  width: '100%', padding: '0.625rem 0.75rem', borderRadius: '12px',
                   background: isActive ? 'var(--rs-color-background-primary-faded)' : 'transparent',
                   border: 'none', cursor: 'pointer', transition: 'all 0.15s',
                   color: isActive ? 'var(--rs-color-foreground-primary-default)' : 'var(--rs-color-foreground-neutral-default)',
@@ -76,14 +76,14 @@ export default function Sidebar() {
           </Text>
 
           <View direction="row" align="center" gap={2} padding={2} style={{
-            background: 'var(--rs-color-background-neutral-faded)', borderRadius: '8px'
+            background: 'var(--rs-color-background-neutral-faded)', borderRadius: '12px'
           }}>
             <Flame size={18} color="#f97316" />
             <Text variant="body-2" style={{ flex: 1 }}>{todayDone} / {activeHabits.length} done</Text>
           </View>
 
           <View direction="row" align="center" gap={2} padding={2} style={{
-            background: 'var(--rs-color-background-neutral-faded)', borderRadius: '8px'
+            background: 'var(--rs-color-background-neutral-faded)', borderRadius: '12px'
           }}>
             <Target size={18} color="#3b82f6" />
             <Text variant="body-2" style={{ flex: 1 }}>{activeHabits.length} active habits</Text>
@@ -91,18 +91,18 @@ export default function Sidebar() {
 
           {/* XP & Level */}
           <View direction="row" align="center" gap={2} padding={2} style={{
-            background: 'linear-gradient(135deg, rgba(139,92,246,0.1), rgba(59,130,246,0.05))',
-            borderRadius: '8px', border: '1px solid rgba(139,92,246,0.2)'
+            background: 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(59,130,246,0.04))',
+            borderRadius: '12px', border: '1px solid rgba(139,92,246,0.15)'
           }}>
             <Trophy size={18} color="#8b5cf6" />
             <View style={{ flex: 1 }}>
               <Text variant="caption-1" weight="bold">Level {level}</Text>
               <div style={{
-                height: 4, borderRadius: 2, background: 'var(--rs-color-background-neutral-faded)',
+                height: 4, borderRadius: 99, background: 'var(--rs-color-background-neutral-faded)',
                 marginTop: 4, overflow: 'hidden'
               }}>
                 <div style={{
-                  height: '100%', borderRadius: 2,
+                  height: '100%', borderRadius: 99,
                   background: 'linear-gradient(90deg, #8b5cf6, #3b82f6)',
                   width: `${(xp % 100)}%`, transition: 'width 0.5s ease'
                 }} />
@@ -112,7 +112,7 @@ export default function Sidebar() {
           </View>
         </View>
 
-        {/* Bottom - Tutorial */}
+        {/* Bottom */}
         <div style={{ marginTop: 'auto' }}>
           <Divider />
           <View paddingTop={2}>
@@ -120,7 +120,7 @@ export default function Sidebar() {
               onClick={() => setView('tutorial')}
               style={{
                 display: 'flex', alignItems: 'center', gap: '0.75rem',
-                width: '100%', padding: '0.5rem 0.75rem', borderRadius: '8px',
+                width: '100%', padding: '0.5rem 0.75rem', borderRadius: '12px',
                 background: 'transparent', border: 'none', cursor: 'pointer',
                 color: 'var(--rs-color-foreground-neutral-faded)', fontSize: '0.8125rem',
               }}
@@ -128,10 +128,10 @@ export default function Sidebar() {
               onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
             >
               <HelpCircle size={16} />
-              <span>Help & Tutorial</span>
+              <span>Help and Tutorial</span>
             </button>
             <View direction="row" align="center" gap={1} padding={2} style={{ justifyContent: 'center' }}>
-              <Sparkles size={12} color="var(--rs-color-foreground-neutral-faded)" />
+              <Zap size={12} color="var(--rs-color-foreground-neutral-faded)" />
               <Text variant="caption-2" color="neutral-faded">Ctrl+K for commands</Text>
             </View>
           </View>

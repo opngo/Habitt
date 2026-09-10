@@ -2,8 +2,9 @@ import React, { useMemo } from 'react';
 import { View, Text, Button, Icon, Badge, Divider } from 'reshaped';
 import {
   ArrowLeft, Flame, Trophy, Target, TrendingUp, Calendar, Trash2,
-  Archive, BarChart3, Check, Circle, Edit2
+  Archive, BarChart3, Check, Circle
 } from 'lucide-react';
+import DynIcon from '../Shared/DynIcon';
 import { useStore } from '../../lib/store';
 import { toggleCompletion, updateHabit, deleteHabit } from '../../lib/db';
 import {
@@ -67,7 +68,7 @@ export default function HabitDetailPage({ refreshData }) {
             alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem',
             boxShadow: `0 4px 12px ${habit.color}20`,
           }}>
-            {habit.icon}
+            <DynIcon name={habit.icon || 'Zap'} size={32} color={habit.color} />
           </div>
           <View style={{ flex: 1 }}>
             <Text variant="title-1" weight="bold">{habit.name}</Text>
@@ -113,7 +114,7 @@ export default function HabitDetailPage({ refreshData }) {
               <button key={ds} className={`day-chip ${done ? 'completed' : ''}`} onClick={() => handleToggleDay(ds)}>
                 <span className="day-label">{format(date, 'EEE')}</span>
                 <span className="day-num">{format(date, 'd')}</span>
-                <span className="day-icon">{done ? '✅' : '○'}</span>
+                <span className="day-icon">{done ? '' : ''}</span>
               </button>
             );
           })}
@@ -156,7 +157,7 @@ export default function HabitDetailPage({ refreshData }) {
           </div>
           <View marginTop={2}>
             <Text variant="caption-1" color="neutral-faded">
-              📊 Best day: <strong>{stats.maxDay?.name}</strong> with {stats.maxDay?.count} completions
+               Best day: <strong>{stats.maxDay?.name}</strong> with {stats.maxDay?.count} completions
             </Text>
           </View>
         </View>

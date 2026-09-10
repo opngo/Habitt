@@ -3,7 +3,8 @@ import { View, Text, Button, Icon, Modal, TextField, TextArea, Select, Switch, S
 import { Plus, Sparkles, BookOpen } from 'lucide-react';
 import { useStore } from '../../lib/store';
 import { createHabit, updateHabit } from '../../lib/db';
-import { COLORS, CATEGORIES, HABIT_TEMPLATES, FREQUENCY_OPTIONS } from '../../lib/constants';
+import { COLORS, CATEGORIES, HABIT_TEMPLATES, FREQUENCY_OPTIONS, HABIT_ICON_NAMES } from '../../lib/constants';
+import DynIcon from '../Shared/DynIcon';
 
 export default function CreateHabitModal({ refreshData }) {
   const { showCreateModal, setShowCreateModal, editingHabit, setEditingHabit,
@@ -11,7 +12,7 @@ export default function CreateHabitModal({ refreshData }) {
 
   const isEdit = !!editingHabit;
   const [form, setForm] = useState({
-    name: '', description: '', icon: '✨', color: '#22c55e',
+    name: '', description: '', icon: 'Zap', color: '#22c55e',
     category: 'General', frequency: 'daily', target_count: 1,
     reminder_enabled: false, reminder_time: '09:00', custom_days: '',
     difficulty: 'medium', notes_template: '',
@@ -20,7 +21,7 @@ export default function CreateHabitModal({ refreshData }) {
   useEffect(() => {
     if (editingHabit) setForm({ ...editingHabit });
     else setForm({
-      name: '', description: '', icon: '✨', color: '#22c55e',
+      name: '', description: '', icon: 'Zap', color: '#22c55e',
       category: 'General', frequency: 'daily', target_count: 1,
       reminder_enabled: false, reminder_time: '09:00', custom_days: '',
       difficulty: 'medium', notes_template: '',
@@ -34,11 +35,11 @@ export default function CreateHabitModal({ refreshData }) {
     if (!form.name.trim()) return;
     if (isEdit) {
       await updateHabit(form.id, form);
-      addToast({ type: 'success', message: '✅ Habit updated!' });
+      addToast({ type: 'success', message: 'Habit updated!' });
     } else {
       await createHabit(form);
       addXp(20);
-      addToast({ type: 'success', message: '🎉 Habit created! +20 XP' });
+      addToast({ type: 'success', message: 'Habit created! +20 XP' });
       if (habits.length === 0) unlockAchievement('first_habit');
       if (habits.length === 4) unlockAchievement('five_habits');
       if (habits.length === 9) unlockAchievement('ten_habits');
@@ -56,7 +57,7 @@ export default function CreateHabitModal({ refreshData }) {
     setForm(f => ({ ...f, name: t.name, icon: t.icon, category: t.category, description: t.description, target_count: t.target || 1 }));
   }
 
-  const EMOJI_SET = ['💪','🏃','🧘','📚','💧','🥗','😴','🎯','✍️','🎨','🎵','💻','🌱','☀️','🌙','❤️','🧠','🎓','💼','🏠','🚶','🚴','🏊','⚡','🔥','⭐','✨','🌟','🎉','🏆','📖','🧹','💊','☕','📵','🙏','🌲','📸','🎧','🚿'];
+  const EMOJI_SET = ['','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','',''];
 
   return (
     <div style={{
@@ -78,7 +79,7 @@ export default function CreateHabitModal({ refreshData }) {
             width: 32, height: 32, borderRadius: 8, border: 'none', cursor: 'pointer',
             background: 'var(--rs-color-background-neutral-faded)', fontSize: '1rem',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>✕</button>
+          }}></button>
         </View>
 
         <form onSubmit={handleSubmit}>
@@ -95,7 +96,7 @@ export default function CreateHabitModal({ refreshData }) {
                       whiteSpace: 'nowrap', fontSize: '0.75rem', fontWeight: 500,
                       display: 'flex', alignItems: 'center', gap: 4,
                     }}>
-                      {t.icon} {t.name}
+                      <DynIcon name={t.icon} size={14} /> {t.name}
                     </button>
                   ))}
                 </div>
@@ -109,19 +110,19 @@ export default function CreateHabitModal({ refreshData }) {
                 <div style={{
                   width: 56, height: 56, borderRadius: 14,
                   background: `${form.color}18`, display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', fontSize: '2rem',
+                  alignItems: 'center', justifyContent: 'center',
                   border: `2px solid ${form.color}40`,
                 }}>
-                  {form.icon}
+                  <DynIcon name={form.icon || 'Zap'} size={24} color={form.color} />
                 </div>
                 <View style={{ flex: 1 }}>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
-                    {EMOJI_SET.slice(0, 16).map(e => (
+                    {ICON_SET.slice(0, 16).map(e => (
                       <button key={e} type="button" onClick={() => update('icon', e)} style={{
-                        width: 28, height: 28, borderRadius: 6, border: form.icon === e ? `2px solid ${form.color}` : '2px solid transparent',
+                        width: 32, height: 32, borderRadius: 8, border: form.icon === e ? `2px solid ${form.color}` : '2px solid transparent',
                         background: form.icon === e ? `${form.color}15` : 'transparent',
-                        cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>{e}</button>
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}><DynIcon name={e} size={16} color={form.icon === e ? form.color : undefined} /></button>
                     ))}
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
@@ -194,7 +195,7 @@ export default function CreateHabitModal({ refreshData }) {
                     fontWeight: 600, fontSize: '0.8125rem', textTransform: 'capitalize',
                     color: form.difficulty === d ? (d === 'easy' ? '#22c55e' : d === 'medium' ? '#f59e0b' : '#ef4444') : 'var(--rs-color-foreground-neutral-default)',
                   }}>
-                    {d === 'easy' ? '😊' : d === 'medium' ? '💪' : '🔥'} {d}
+                    {d}
                   </button>
                 ))}
               </View>

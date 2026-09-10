@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, Button, Icon, TextArea, Badge, Divider } from 'reshaped';
-import { BookOpen, ChevronLeft, ChevronRight, Calendar, Heart, Zap } from 'lucide-react';
+import { BookOpen, ChevronLeft, ChevronRight, Calendar, Heart, Zap, BedDouble, HeartHandshake } from 'lucide-react';
+import DynIcon from '../Shared/DynIcon';
 import { useStore } from '../../lib/store';
 import { saveJournalEntry } from '../../lib/db';
 import { getToday, formatDisplay, formatShort } from '../../lib/utils';
@@ -42,18 +43,18 @@ export default function JournalPage({ refreshData }) {
     await refreshData();
     setSaved(true);
     addXp(15);
-    addToast({ type: 'success', message: '📝 Journal saved! +15 XP' });
+    addToast({ type: 'success', message: 'Journal saved! +15 XP' });
     if (journalEntries.length === 0) unlockAchievement('journal_1');
     if (journalEntries.length >= 29) unlockAchievement('journal_30');
     setTimeout(() => setSaved(false), 2000);
   }
 
   const energyLevels = [
-    { value: 1, emoji: '🪫', label: 'Exhausted' },
-    { value: 2, emoji: '😴', label: 'Low' },
-    { value: 3, emoji: '🙂', label: 'Normal' },
-    { value: 4, emoji: '⚡', label: 'High' },
-    { value: 5, emoji: '🚀', label: 'Supercharged' },
+    { value: 1, icon: 'BatteryLow', label: 'Exhausted', color: '#ef4444' },
+    { value: 2, icon: 'Battery', label: 'Low', color: '#f97316' },
+    { value: 3, icon: 'BatteryMedium', label: 'Normal', color: '#f59e0b' },
+    { value: 4, icon: 'BatteryFull', label: 'High', color: '#22c55e' },
+    { value: 5, icon: 'Zap', label: 'Supercharged', color: '#3b82f6' },
   ];
 
   return (
@@ -102,7 +103,7 @@ export default function JournalPage({ refreshData }) {
               {MOODS.map(m => (
                 <button key={m.value} className={`mood-btn ${entry.mood === m.value ? 'selected' : ''}`}
                   onClick={() => setEntry(e => ({ ...e, mood: m.value }))}>
-                  <span className="emoji">{m.emoji}</span>
+                  <span className="mood-icon"><DynIcon name={m.icon} size={24} color={m.color} /></span>
                   <span className="label">{m.label}</span>
                 </button>
               ))}
@@ -116,7 +117,7 @@ export default function JournalPage({ refreshData }) {
               {energyLevels.map(e => (
                 <button key={e.value} className={`mood-btn ${entry.energy === e.value ? 'selected' : ''}`}
                   onClick={() => setEntry(en => ({ ...en, energy: e.value }))}>
-                  <span className="emoji">{e.emoji}</span>
+                  <span className="mood-icon"><DynIcon name={e.icon} size={24} color={e.color} /></span>
                   <span className="label">{e.label}</span>
                 </button>
               ))}
@@ -125,7 +126,7 @@ export default function JournalPage({ refreshData }) {
 
           {/* Sleep hours */}
           <View direction="row" gap={3} align="center">
-            <Text variant="body-2" weight="bold">😴 Hours of sleep:</Text>
+            <Text variant="body-2" weight="bold"><BedDouble size={16} style={{ display: 'inline', marginRight: 6 }} /> Hours of sleep:</Text>
             <input
               type="number" min="0" max="24" step="0.5"
               value={entry.sleep_hours}
@@ -162,7 +163,7 @@ export default function JournalPage({ refreshData }) {
 
           {/* Gratitude */}
           <View>
-            <Text variant="body-2" weight="bold" marginBottom={2}>🙏 What are you grateful for today?</Text>
+            <Text variant="body-2" weight="bold" marginBottom={2}><HeartHandshake size={16} style={{ display: 'inline', marginRight: 6 }} />What are you grateful for today?</Text>
             <textarea
               value={entry.gratitude}
               onChange={(e) => setEntry(en => ({ ...en, gratitude: e.target.value }))}
@@ -182,7 +183,7 @@ export default function JournalPage({ refreshData }) {
           <View direction="row" style={{ justifyContent: 'flex-end' }}>
             <Button color="primary" size="large" onClick={handleSave}
               startIcon={<Icon svg={<BookOpen size={16} />} />}>
-              {saved ? '✓ Saved!' : 'Save Entry'}
+              {saved ? ' Saved!' : 'Save Entry'}
             </Button>
           </View>
         </View>
@@ -207,7 +208,7 @@ export default function JournalPage({ refreshData }) {
                     background: e.date === selectedDate ? 'var(--rs-color-background-primary-faded)' : 'transparent',
                   }}>
                     <Text variant="caption-1" weight="bold">{formatShort(e.date)}</Text>
-                    <span>{MOODS.find(m => m.value === e.mood)?.emoji || '😐'}</span>
+                    <span><DynIcon name={MOODS.find(m => m.value === e.mood)?.icon || 'Minus'} size={14} color={MOODS.find(m => m.value === e.mood)?.color} /></span>
                     <Text variant="caption-2" color="neutral-faded" style={{
                       flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
                     }}>

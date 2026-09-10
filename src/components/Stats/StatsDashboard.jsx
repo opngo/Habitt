@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { View, Text, Badge, Divider } from 'reshaped';
-import { Trophy, Flame, Target, TrendingUp, Calendar, Award, Star, Zap } from 'lucide-react';
+import { Trophy, Flame, Target, TrendingUp, Calendar, Award, Star, Zap, Medal, BarChart3, PieChart, SmilePlus } from 'lucide-react';
 import { useStore } from '../../lib/store';
+import DynIcon from '../Shared/DynIcon';
 import { getCurrentStreak, getLongestStreak, getCompletionRate, getLast30Days, getLast7Days, getDayOfWeekStats, toStr } from '../../lib/utils';
 import { ACHIEVEMENTS, MOODS } from '../../lib/constants';
 import YearHeatmap from '../Heatmap/YearHeatmap';
@@ -86,7 +87,7 @@ export default function StatsDashboard() {
 
       {/* Streak Leaderboard */}
       <View marginBottom={6}>
-        <Text variant="title-3" weight="bold" marginBottom={3}>🏆 Streak Leaderboard</Text>
+        <Text variant="title-3" weight="bold" marginBottom={3}> Streak Leaderboard</Text>
         <View gap={2}>
           {overallStats.streaks.slice(0, 8).map((h, i) => (
             <View key={h.id} direction="row" align="center" gap={3} padding={3} style={{
@@ -131,7 +132,7 @@ export default function StatsDashboard() {
       {/* Day of Week Pattern */}
       <View direction="row" gap={6} marginBottom={6}>
         <View style={{ flex: 1 }}>
-          <Text variant="title-3" weight="bold" marginBottom={3}>📅 Day of Week Pattern</Text>
+          <Text variant="title-3" weight="bold" marginBottom={3}>Day of Week Pattern</Text>
           <View padding={4} style={{
             background: 'var(--rs-color-background-neutral-default)',
             border: '1px solid var(--rs-color-border-neutral-faded)',
@@ -157,7 +158,7 @@ export default function StatsDashboard() {
 
         {/* Category Breakdown */}
         <View style={{ flex: 1 }}>
-          <Text variant="title-3" weight="bold" marginBottom={3}>📊 Category Breakdown</Text>
+          <Text variant="title-3" weight="bold" marginBottom={3}>Category Breakdown</Text>
           <View gap={2}>
             {Object.entries(overallStats.catBreakdown).map(([cat, data]) => (
               <View key={cat} direction="row" align="center" gap={3} padding={2} style={{
@@ -165,7 +166,7 @@ export default function StatsDashboard() {
               }}>
                 <Text variant="body-3" style={{ flex: 1 }}>{cat}</Text>
                 <Badge size="small" variant="faded" rounded>{data.count} habits</Badge>
-                <Text variant="caption-1" weight="bold">{data.completions} ✓</Text>
+                <Text variant="caption-1" weight="bold">{data.completions} </Text>
               </View>
             ))}
             {Object.keys(overallStats.catBreakdown).length === 0 && (
@@ -178,7 +179,7 @@ export default function StatsDashboard() {
       {/* Mood Trend */}
       {overallStats.moodTrend.length > 0 && (
         <View marginBottom={6}>
-          <Text variant="title-3" weight="bold" marginBottom={3}>😊 Mood Trend (Last 14 Entries)</Text>
+          <Text variant="title-3" weight="bold" marginBottom={3}>Mood Trend (Last 14 Entries)</Text>
           <View padding={4} style={{
             background: 'var(--rs-color-background-neutral-default)',
             border: '1px solid var(--rs-color-border-neutral-faded)',
@@ -192,7 +193,7 @@ export default function StatsDashboard() {
                     background: MOODS[m.mood - 1]?.color || '#94a3b8',
                     borderRadius: '4px 4px 0 0', transition: 'height 0.5s',
                   }} />
-                  <Text variant="caption-2">{MOODS[m.mood - 1]?.emoji}</Text>
+                  <DynIcon name={MOODS[m.mood - 1]?.icon || 'Minus'} size={14} color={MOODS[m.mood - 1]?.color} />
                 </div>
               ))}
             </div>
@@ -202,7 +203,7 @@ export default function StatsDashboard() {
 
       {/* Achievements */}
       <View marginBottom={6}>
-        <Text variant="title-3" weight="bold" marginBottom={3}>🏅 Achievements ({achievements.length}/{ACHIEVEMENTS.length})</Text>
+        <Text variant="title-3" weight="bold" marginBottom={3}> Achievements ({achievements.length}/{ACHIEVEMENTS.length})</Text>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.75rem' }}>
           {ACHIEVEMENTS.map(a => {
             const unlocked = achievements.includes(a.id);

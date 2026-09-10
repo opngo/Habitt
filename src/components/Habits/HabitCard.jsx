@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, Icon, Badge, Tooltip } from 'reshaped';
-import { Flame, Trophy, Check, Circle, MoreHorizontal } from 'lucide-react';
+import { Flame, Trophy, Check, Circle } from 'lucide-react';
+import DynIcon from '../Shared/DynIcon';
 import { useStore } from '../../lib/store';
 import { toggleCompletion } from '../../lib/db';
 import { getToday, getCurrentStreak, getLongestStreak } from '../../lib/utils';
@@ -25,7 +26,7 @@ export default function HabitCard({ habit, isCompleted, refreshData }) {
 
     if (wasAdded) {
       addXp(10);
-      addToast({ type: 'success', message: `✅ ${habit.name} completed! +10 XP` });
+      addToast({ type: 'success', message: `${habit.name} completed! +10 XP` });
 
       // Check time-based achievements
       const hour = new Date().getHours();
@@ -70,7 +71,7 @@ export default function HabitCard({ habit, isCompleted, refreshData }) {
           fontSize: '1.5rem', flexShrink: 0,
           boxShadow: `0 2px 8px ${habit.color}20`
         }}>
-          {habit.icon || '✨'}
+          <DynIcon name={habit.icon || 'Zap'} size={24} color={habit.color} />
         </div>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text variant="body-1" weight="bold" style={{

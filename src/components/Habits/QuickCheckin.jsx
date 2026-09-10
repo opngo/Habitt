@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, Button, Icon } from 'reshaped';
-import { X, Check, Zap, Flame } from 'lucide-react';
+import { X, Check, Zap, Flame, PartyPopper } from 'lucide-react';
+import DynIcon from '../Shared/DynIcon';
 import { useStore } from '../../lib/store';
 import { toggleCompletion } from '../../lib/db';
 import { getToday, getCurrentStreak } from '../../lib/utils';
@@ -20,7 +21,7 @@ export default function QuickCheckin({ refreshData }) {
     if (wasAdded) {
       newSet.add(habit.id);
       addXp(10);
-      addToast({ type: 'success', message: `✅ ${habit.name} done! +10 XP` });
+      addToast({ type: 'success', message: `${habit.name} done! +10 XP` });
     } else {
       newSet.delete(habit.id);
     }
@@ -90,7 +91,7 @@ export default function QuickCheckin({ refreshData }) {
                   background: `${habit.color}18`, display: 'flex',
                   alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem',
                 }}>
-                  {habit.icon}
+                  <DynIcon name={habit.icon || 'Zap'} size={24} color={habit.color} />
                 </div>
                 <View style={{ flex: 1 }}>
                   <Text variant="body-1" weight="bold" style={{
@@ -127,7 +128,7 @@ export default function QuickCheckin({ refreshData }) {
             background: 'linear-gradient(135deg, rgba(34,197,94,0.08), rgba(59,130,246,0.05))',
             borderRadius: 12, border: '1px solid rgba(34,197,94,0.2)',
           }}>
-            <div style={{ fontSize: '2rem', marginBottom: 8 }}>🎉</div>
+            <PartyPopper size={32} color="#22c55e" style={{ marginBottom: 8 }} />
             <Text variant="title-3" weight="bold">All Done!</Text>
             <Text variant="body-3" color="neutral-faded">Amazing work today. Keep the streak going!</Text>
           </View>
