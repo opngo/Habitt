@@ -75,7 +75,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v__VERSION__' }}
-          releaseName: 'Habitt. ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v__VERSION__' }}'
+          releaseName: "Habitt. ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v__VERSION__' }}"
           releaseBody: |
             ## Habitt. 🎉
 
