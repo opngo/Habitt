@@ -1,9 +1,9 @@
 import React, { useEffect, useCallback } from 'react';
-import { Reshaped, Theme } from 'reshaped';
+import { Reshaped } from 'reshaped';
 import 'reshaped/themes/slate/theme.css';
 import { Sprout } from 'lucide-react';
 import { useStore } from './lib/store';
-import { getHabits, getCompletions, getJournalEntries, getAllSettings, getSetting } from './lib/db';
+import { getHabits, getCompletions, getJournalEntries, getDayNotes, getFocusSessions, getVacationPeriods, getSetting } from './lib/db';
 import Titlebar from './components/Layout/Titlebar';
 import Sidebar from './components/Layout/Sidebar';
 import Dashboard from './components/Habits/Dashboard';
@@ -17,32 +17,38 @@ import CreateHabitModal from './components/Habits/CreateHabitModal';
 import CommandPalette from './components/Shared/CommandPalette';
 import ToastContainer from './components/Shared/ToastContainer';
 import QuickCheckin from './components/Habits/QuickCheckin';
+import FocusTimer from './components/Shared/FocusTimer';
+import DayNoteModal from './components/Shared/DayNoteModal';
 
 export default function App() {
   const {
     currentView, colorMode, setColorMode, isAuthenticated, passwordEnabled,
     setPasswordEnabled, setAuthenticated, tutorialDone, setTutorialDone,
-    setHabits, setCompletions, setJournalEntries, showCreateModal,
-    showCommandPalette, setShowCommandPalette, quickCheckinMode,
-    setQuickCheckinMode, toasts
+    setHabits, setCompletions, setJournalEntries, setDayNotes, setFocusSessions, setVacationPeriods,
+    showCreateModal, showCommandPalette, setShowCommandPalette, quickCheckinMode,
+    showFocusTimer, showDayNoteModal, toasts
   } = useStore();
 
   const [loading, setLoading] = React.useState(true);
 
   const refreshData = useCallback(async () => {
     try {
-      const [h, c, j] = await Promise.all([getHabits(), getCompletions(), getJournalEntries()]);
+      const [h, c, j, n, f, v] = await Promise.all([
+        getHabits(), getCompletions(), getJournalEntries(),
+        getDayNotes(), getFocusSessions(), getVacationPeriods()
+      ]);
       setHabits(h); setCompletions(c); setJournalEntries(j);
+      setDayNotes(n || []); setFocusSessions(f || []); setVacationPeriods(v || []);
     } catch (e) { console.error('Refresh error:', e); }
-  }, [setHabits, setCompletions, setJournalEntries]);
+  }, [setHabits, setCompletions, setJournalEntries, setDayNotes, setFocusSessions, setVacationPeriods]);
 
   useEffect(() => {
     (async () => {
       try {
         const theme = await getSetting('theme');
-        if (theme) { setColorMode(theme); }
+        if (theme) setColorMode(theme);
         const pwd = await getSetting('password_hash');
-        if (pwd) { setPasswordEnabled(true); } else { setAuthenticated(true); }
+        if (pwd) setPasswordEnabled(true); else setAuthenticated(true);
         const tut = await getSetting('tutorial_completed');
         if (tut) setTutorialDone(true);
         await refreshData();
@@ -54,14 +60,8 @@ export default function App() {
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setShowCommandPalette(true);
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
-        e.preventDefault();
-        useStore.setState({ showCreateModal: true });
-      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setShowCommandPalette(true); }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'n') { e.preventDefault(); useStore.setState({ showCreateModal: true }); }
       if (e.key === 'Escape') {
         setShowCommandPalette(false);
         useStore.setState({ showCreateModal: false, showTemplateLibrary: false });
@@ -73,11 +73,11 @@ export default function App() {
 
   if (loading) {
     return (
-    <Reshaped theme="slate" colorMode={colorMode}>
-      <Titlebar />
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', flexDirection:'column', gap:'1rem', paddingTop: 36 }}>
+      <Reshaped theme="slate" colorMode={colorMode}>
+        <Titlebar />
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', flexDirection:'column', gap:'1rem', paddingTop: 36 }}>
           <Sprout size={48} color="var(--rs-color-foreground-primary-default)" />
-          <div style={{ fontSize:'1.25rem', fontWeight:700, color:'var(--rs-color-foreground-neutral-default)' }}>Habitt.</div>
+          <div style={{ fontSize:'1.25rem', fontWeight:700 }}>Habitt</div>
           <div style={{ color:'var(--rs-color-foreground-neutral-faded)', fontSize:'0.875rem' }}>Loading your habits...</div>
         </div>
       </Reshaped>
@@ -85,19 +85,11 @@ export default function App() {
   }
 
   if (!isAuthenticated) {
-    return (
-      <Reshaped theme="slate" colorMode={colorMode}>
-        <PasswordGate />
-      </Reshaped>
-    );
+    return (<Reshaped theme="slate" colorMode={colorMode}><Titlebar /><PasswordGate /></Reshaped>);
   }
 
   if (!tutorialDone && currentView !== 'settings') {
-    return (
-      <Reshaped theme="slate" colorMode={colorMode}>
-        <Tutorial />
-      </Reshaped>
-    );
+    return (<Reshaped theme="slate" colorMode={colorMode}><Titlebar /><Tutorial /></Reshaped>);
   }
 
   const renderView = () => {
@@ -113,6 +105,7 @@ export default function App() {
 
   return (
     <Reshaped theme="slate" colorMode={colorMode}>
+      <Titlebar />
       <div className="app-shell">
         <Sidebar />
         <main className="app-main">
@@ -127,6 +120,8 @@ export default function App() {
       </div>
       {showCreateModal && <CreateHabitModal refreshData={refreshData} />}
       {showCommandPalette && <CommandPalette />}
+      {showFocusTimer && <FocusTimer refreshData={refreshData} />}
+      {showDayNoteModal && <DayNoteModal refreshData={refreshData} />}
       <ToastContainer />
     </Reshaped>
   );

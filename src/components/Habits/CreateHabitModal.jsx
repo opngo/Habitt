@@ -3,7 +3,7 @@ import { View, Text, Button, Icon, Modal, TextField, TextArea, Select, Switch, S
 import { Plus, Sparkles, BookOpen } from 'lucide-react';
 import { useStore } from '../../lib/store';
 import { createHabit, updateHabit } from '../../lib/db';
-import { COLORS, CATEGORIES, HABIT_TEMPLATES, FREQUENCY_OPTIONS, HABIT_ICON_NAMES } from '../../lib/constants';
+import { COLORS, CATEGORIES, HABIT_TEMPLATES, SCHEDULE_TYPES, HABIT_TYPES, HABIT_ICON_NAMES } from '../../lib/constants';
 import DynIcon from '../Shared/DynIcon';
 
 export default function CreateHabitModal({ refreshData }) {
@@ -176,7 +176,7 @@ export default function CreateHabitModal({ refreshData }) {
                   value={form.frequency}
                   onChange={({ value }) => update('frequency', value)}
                 >
-                  {FREQUENCY_OPTIONS.map(f => (
+                  {SCHEDULE_TYPES.map(f => (
                     <option key={f.value} value={f.value}>{f.label}</option>
                   ))}
                 </Select>
