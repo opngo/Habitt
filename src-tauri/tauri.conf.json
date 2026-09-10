@@ -9,7 +9,6 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "title": "Habitt.",
     "windows": [
       {
         "title": "Habitt.",
