@@ -1,231 +1,189 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Button, Icon, Modal, TextField, TextArea, Select, Switch, Slider } from 'reshaped';
-import { Plus, Sparkles, BookOpen } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, X, Grip } from 'lucide-react';
 import { useStore } from '../../lib/store';
-import { createHabit, updateHabit } from '../../lib/db';
-import { COLORS, CATEGORIES, HABIT_TEMPLATES, SCHEDULE_TYPES, HABIT_TYPES, HABIT_ICON_NAMES } from '../../lib/constants';
+import { CATEGORIES, COLORS, HABIT_TYPES, SCHEDULE_TYPES, DIFFICULTIES, DAY_NAMES_SHORT } from '../../lib/constants';
+import IconPicker from '../Shared/IconPicker';
+import ColorPicker from '../Shared/ColorPicker';
+import Modal from '../Shared/Modal';
 import DynIcon from '../Shared/DynIcon';
 
-export default function CreateHabitModal({ refreshData }) {
-  const { showCreateModal, setShowCreateModal, editingHabit, setEditingHabit,
-    setShowTemplateLibrary, addToast, addXp, unlockAchievement, habits } = useStore();
+export default function CreateHabitModal() {
+  const { editingHabit, addHabit, updateHabit, setUI, addToast } = useStore();
+  const editing = !!editingHabit;
+  const h = editingHabit || {};
 
-  const isEdit = !!editingHabit;
-  const [form, setForm] = useState({
-    name: '', description: '', icon: 'Zap', color: '#22c55e',
-    category: 'General', frequency: 'daily', target_count: 1,
-    reminder_enabled: false, reminder_time: '09:00', custom_days: '',
-    difficulty: 'medium', notes_template: '',
+  const [f, setF] = useState({
+    name: h.name || '',
+    description: h.description || '',
+    icon: h.icon || 'Zap',
+    color: h.color || COLORS[0],
+    category: h.category || 'General',
+    habit_type: h.habit_type || 'normal',
+    schedule_type: h.schedule_type || h.frequency || 'daily',
+    schedule_value: h.schedule_value || (h.schedule_type === 'x_per_month' ? 10 : 3),
+    custom_days: (h.custom_days || '').split(',').filter(Boolean).map(Number),
+    target_count: h.target_count || 8,
+    unit: h.unit || '',
+    difficulty: h.difficulty || 'medium',
+    checklist: h.checklist || [],
+    tags: h.tags || [],
   });
+  const [newStep, setNewStep] = useState('');
+  const [newTag, setNewTag] = useState('');
+  const [showIcon, setShowIcon] = useState(false);
 
-  useEffect(() => {
-    if (editingHabit) setForm({ ...editingHabit });
-    else setForm({
-      name: '', description: '', icon: 'Zap', color: '#22c55e',
-      category: 'General', frequency: 'daily', target_count: 1,
-      reminder_enabled: false, reminder_time: '09:00', custom_days: '',
-      difficulty: 'medium', notes_template: '',
-    });
-  }, [editingHabit]);
+  const set = (patch) => setF((x) => ({ ...x, ...patch }));
 
-  function update(field, value) { setForm(f => ({ ...f, [field]: value })); }
+  const save = () => {
+    if (!f.name.trim()) { addToast({ type: 'error', message: 'Give your habit a name first' }); return; }
+    const payload = {
+      ...f,
+      name: f.name.trim(),
+      custom_days: Array.isArray(f.custom_days) ? f.custom_days.join(',') : f.custom_days,
+      schedule_value: f.schedule_type === 'x_per_week' || f.schedule_type === 'x_per_month' || f.schedule_type === 'every_n_days' ? Number(f.schedule_value) || 1 : 0,
+    };
+    if (editing) updateHabit(h.id, payload);
+    else addHabit(payload);
+    setUI({ showCreateModal: false, editingHabit: null });
+  };
 
-  async function handleSubmit(e) {
-    e?.preventDefault?.();
-    if (!form.name.trim()) return;
-    if (isEdit) {
-      await updateHabit(form.id, form);
-      addToast({ type: 'success', message: 'Habit updated!' });
-    } else {
-      await createHabit(form);
-      addXp(20);
-      addToast({ type: 'success', message: 'Habit created! +20 XP' });
-      if (habits.length === 0) unlockAchievement('first_habit');
-      if (habits.length === 4) unlockAchievement('five_habits');
-      if (habits.length === 9) unlockAchievement('ten_habits');
-    }
-    await refreshData();
-    close();
-  }
-
-  function close() {
-    setShowCreateModal(false);
-    setEditingHabit(null);
-  }
-
-  function useTemplate(t) {
-    setForm(f => ({ ...f, name: t.name, icon: t.icon, category: t.category, description: t.description, target_count: t.target || 1 }));
-  }
-
-  const EMOJI_SET = ['','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','',''];
+  const toggleDay = (d) => {
+    const cur = new Set(f.custom_days);
+    if (cur.has(d)) cur.delete(d); else cur.add(d);
+    set({ custom_days: [...cur].sort() });
+  };
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-      backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center',
-      justifyContent: 'center', zIndex: 1000, padding: '1rem'
-    }} onClick={(e) => e.target === e.currentTarget && close()}>
-      <div className="animate-scale-in" style={{
-        background: 'var(--rs-color-background-neutral-default)',
-        borderRadius: 16, width: '100%', maxWidth: 560, maxHeight: '90vh',
-        overflow: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.15)'
-      }}>
-        {/* Header */}
-        <View direction="row" align="center" padding={5} style={{
-          justifyContent: 'space-between', borderBottom: '1px solid var(--rs-color-border-neutral-faded)'
-        }}>
-          <Text variant="title-3" weight="bold">{isEdit ? 'Edit Habit' : 'Create New Habit'}</Text>
-          <button onClick={close} style={{
-            width: 32, height: 32, borderRadius: 8, border: 'none', cursor: 'pointer',
-            background: 'var(--rs-color-background-neutral-faded)', fontSize: '1rem',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}></button>
-        </View>
-
-        <form onSubmit={handleSubmit}>
-          <View padding={5} gap={4}>
-            {/* Templates quick-add */}
-            {!isEdit && (
-              <View>
-                <Text variant="caption-1" weight="bold" color="neutral-faded" marginBottom={2}>Quick Templates</Text>
-                <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-                  {HABIT_TEMPLATES.slice(0, 8).map((t, i) => (
-                    <button key={i} type="button" onClick={() => useTemplate(t)} style={{
-                      padding: '6px 12px', borderRadius: 8, border: '1px solid var(--rs-color-border-neutral-faded)',
-                      background: 'var(--rs-color-background-neutral-faded)', cursor: 'pointer',
-                      whiteSpace: 'nowrap', fontSize: '0.75rem', fontWeight: 500,
-                      display: 'flex', alignItems: 'center', gap: 4,
-                    }}>
-                      <DynIcon name={t.icon} size={14} /> {t.name}
-                    </button>
-                  ))}
-                </div>
-              </View>
-            )}
-
-            {/* Icon & Color */}
-            <View>
-              <Text variant="caption-1" weight="bold" color="neutral-faded" marginBottom={2}>Icon & Color</Text>
-              <View direction="row" gap={3} align="center">
-                <div style={{
-                  width: 56, height: 56, borderRadius: 14,
-                  background: `${form.color}18`, display: 'flex',
-                  alignItems: 'center', justifyContent: 'center',
-                  border: `2px solid ${form.color}40`,
-                }}>
-                  <DynIcon name={form.icon || 'Zap'} size={24} color={form.color} />
-                </div>
-                <View style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
-                    {ICON_SET.slice(0, 16).map(e => (
-                      <button key={e} type="button" onClick={() => update('icon', e)} style={{
-                        width: 32, height: 32, borderRadius: 8, border: form.icon === e ? `2px solid ${form.color}` : '2px solid transparent',
-                        background: form.icon === e ? `${form.color}15` : 'transparent',
-                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}><DynIcon name={e} size={16} color={form.icon === e ? form.color : undefined} /></button>
-                    ))}
-                  </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {COLORS.map(c => (
-                      <button key={c} type="button" onClick={() => update('color', c)} style={{
-                        width: 24, height: 24, borderRadius: '50%', background: c,
-                        border: form.color === c ? '3px solid var(--rs-color-foreground-neutral-default)' : '2px solid transparent',
-                        cursor: 'pointer', boxShadow: form.color === c ? `0 0 0 2px var(--rs-color-background-neutral-default), 0 0 0 4px ${c}` : 'none',
-                        transition: 'all 0.15s',
-                      }} />
-                    ))}
-                  </div>
-                </View>
-              </View>
-            </View>
-
-            {/* Name */}
-            <TextField
-              label="Habit Name"
-              placeholder="e.g., Read for 30 minutes"
-              value={form.name}
-              onChange={({ value }) => update('name', value)}
-              required
-            />
-
-            {/* Description */}
-            <TextArea
-              label="Description"
-              placeholder="Why is this habit important to you?"
-              value={form.description}
-              onChange={({ value }) => update('description', value)}
-              rows={2}
-            />
-
-            {/* Category & Frequency */}
-            <View direction="row" gap={3}>
-              <div style={{ flex: 1 }}>
-                <Select
-                  label="Category"
-                  value={form.category}
-                  onChange={({ value }) => update('category', value)}
-                >
-                  {CATEGORIES.map(c => (
-                    <option key={c.name} value={c.name}>{c.icon} {c.name}</option>
-                  ))}
-                </Select>
-              </div>
-              <div style={{ flex: 1 }}>
-                <Select
-                  label="Frequency"
-                  value={form.frequency}
-                  onChange={({ value }) => update('frequency', value)}
-                >
-                  {SCHEDULE_TYPES.map(f => (
-                    <option key={f.value} value={f.value}>{f.label}</option>
-                  ))}
-                </Select>
-              </div>
-            </View>
-
-            {/* Difficulty */}
-            <View>
-              <Text variant="caption-1" weight="bold" color="neutral-faded" marginBottom={2}>Difficulty</Text>
-              <View direction="row" gap={2}>
-                {['easy', 'medium', 'hard'].map(d => (
-                  <button key={d} type="button" onClick={() => update('difficulty', d)} style={{
-                    flex: 1, padding: '8px 12px', borderRadius: 8, cursor: 'pointer',
-                    border: `2px solid ${form.difficulty === d ? (d === 'easy' ? '#22c55e' : d === 'medium' ? '#f59e0b' : '#ef4444') : 'var(--rs-color-border-neutral-faded)'}`,
-                    background: form.difficulty === d ? (d === 'easy' ? 'rgba(34,197,94,0.08)' : d === 'medium' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)') : 'transparent',
-                    fontWeight: 600, fontSize: '0.8125rem', textTransform: 'capitalize',
-                    color: form.difficulty === d ? (d === 'easy' ? '#22c55e' : d === 'medium' ? '#f59e0b' : '#ef4444') : 'var(--rs-color-foreground-neutral-default)',
-                  }}>
-                    {d}
-                  </button>
-                ))}
-              </View>
-            </View>
-
-            {/* Target count */}
-            <View direction="row" gap={3} align="center">
-              <Text variant="body-3">Daily target:</Text>
-              <View direction="row" gap={1} align="center">
-                <button type="button" onClick={() => update('target_count', Math.max(1, form.target_count - 1))}
-                  style={{ width: 28, height: 28, borderRadius: 6, border: '1px solid var(--rs-color-border-neutral-faded)', background: 'var(--rs-color-background-neutral-faded)', cursor: 'pointer', fontWeight: 700 }}>−</button>
-                <Text variant="featured-2" weight="bold" style={{ minWidth: 32, textAlign: 'center' }}>{form.target_count}</Text>
-                <button type="button" onClick={() => update('target_count', Math.min(99, form.target_count + 1))}
-                  style={{ width: 28, height: 28, borderRadius: 6, border: '1px solid var(--rs-color-border-neutral-faded)', background: 'var(--rs-color-background-neutral-faded)', cursor: 'pointer', fontWeight: 700 }}>+</button>
-              </View>
-            </View>
-          </View>
-
-          {/* Footer */}
-          <View direction="row" gap={2} padding={5} style={{
-            justifyContent: 'flex-end', borderTop: '1px solid var(--rs-color-border-neutral-faded)',
-          }}>
-            <Button variant="faded" color="neutral" onClick={close}>Cancel</Button>
-            <Button type="submit" color="primary" disabled={!form.name.trim()}
-              startIcon={<Icon svg={<Plus size={16} />} />}>
-              {isEdit ? 'Save Changes' : 'Create Habit'}
-            </Button>
-          </View>
-        </form>
+    <Modal
+      title={editing ? `Edit “${h.name}”` : 'New habit'}
+      icon={<div className="habit-icon" style={{ '--hc': f.color }}><DynIcon name={f.icon} size={19} /></div>}
+      onClose={() => setUI({ showCreateModal: false, editingHabit: null })}
+      footer={<>
+        <button className="btn" onClick={() => setUI({ showCreateModal: false, editingHabit: null })}>Cancel</button>
+        <button className="btn btn-primary" onClick={save}>{editing ? 'Save changes' : 'Create habit'}</button>
+      </>}
+    >
+      <div className="field">
+        <label className="field-label">Name</label>
+        <input className="input" autoFocus placeholder="e.g. Read before bed" value={f.name} onChange={(e) => set({ name: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && save()} />
       </div>
-    </div>
+
+      <div className="field">
+        <label className="field-label">Description (optional)</label>
+        <input className="input" placeholder="Why does this habit matter?" value={f.description} onChange={(e) => set({ description: e.target.value })} />
+      </div>
+
+      <div className="field">
+        <label className="field-label">Type</label>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+          {HABIT_TYPES.map((t) => (
+            <button key={t.value} type="button" onClick={() => set({ habit_type: t.value })} className="mood-btn" style={f.habit_type === t.value ? { borderColor: f.color, background: `color-mix(in srgb, ${f.color} 11%, transparent)`, color: 'var(--text)' } : {}}>
+              <DynIcon name={t.icon} size={17} color={f.habit_type === t.value ? f.color : undefined} />
+              <span style={{ fontWeight: 800 }}>{t.label}</span>
+              <span style={{ fontWeight: 500, fontSize: '0.62rem', color: 'var(--text-faint)' }}>{t.desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {f.habit_type === 'amount' && (
+        <div className="form-row">
+          <div className="field">
+            <label className="field-label">Daily goal</label>
+            <input className="input" type="number" min="1" value={f.target_count} onChange={(e) => set({ target_count: Math.max(1, Number(e.target.value)) })} />
+          </div>
+          <div className="field">
+            <label className="field-label">Unit</label>
+            <input className="input" placeholder="minutes, pages, glasses…" value={f.unit} onChange={(e) => set({ unit: e.target.value })} />
+          </div>
+        </div>
+      )}
+
+      <div className="field">
+        <label className="field-label">Schedule</label>
+        <div className="form-row" style={{ gridTemplateColumns: f.schedule_type === 'x_per_week' || f.schedule_type === 'x_per_month' || f.schedule_type === 'every_n_days' ? '2fr 1fr' : '1fr' }}>
+          <select className="select" value={f.schedule_type} onChange={(e) => set({ schedule_type: e.target.value })}>
+            {SCHEDULE_TYPES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+          {['x_per_week', 'x_per_month', 'every_n_days'].includes(f.schedule_type) && (
+            <input className="input" type="number" min="1" title={f.schedule_type === 'every_n_days' ? 'Every N days' : 'Times'} value={f.schedule_value} onChange={(e) => set({ schedule_value: Math.max(1, Number(e.target.value)) })} />
+          )}
+        </div>
+        {f.schedule_type === 'custom_days' && (
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            {DAY_NAMES_SHORT.map((d, i) => (
+              <button key={d} type="button" onClick={() => toggleDay(i)} className="chip chip-btn" style={f.custom_days.includes(i) ? { background: 'var(--accent-soft)', borderColor: 'var(--accent)', color: 'var(--accent)' } : {}}>
+                {d.slice(0, 2)}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="form-row-3">
+        <div className="field">
+          <label className="field-label">Category</label>
+          <select className="select" value={f.category} onChange={(e) => {
+            const cat = CATEGORIES.find((c) => c.name === e.target.value);
+            set({ category: e.target.value, icon: cat?.icon || f.icon, color: cat?.color || f.color });
+          }}>
+            {CATEGORIES.map((c) => <option key={c.name}>{c.name}</option>)}
+          </select>
+        </div>
+        <div className="field">
+          <label className="field-label">Difficulty</label>
+          <select className="select" value={f.difficulty} onChange={(e) => set({ difficulty: e.target.value })}>
+            {DIFFICULTIES.map((d) => <option key={d.value} value={d.value}>{d.label} · {d.xp} XP</option>)}
+          </select>
+        </div>
+        <div className="field">
+          <label className="field-label">Icon</label>
+          <button type="button" className="btn" style={{ borderColor: f.color }} onClick={() => setShowIcon((s) => !s)}>
+            <DynIcon name={f.icon} size={16} color={f.color} /> {f.icon}
+          </button>
+        </div>
+      </div>
+
+      {showIcon && (
+        <div className="card card-pad animate-slide-up" style={{ background: 'var(--surface-2)' }}>
+          <IconPicker selected={f.icon} onSelect={(n) => { set({ icon: n }); setShowIcon(false); }} color={f.color} />
+        </div>
+      )}
+
+      <div className="field">
+        <label className="field-label">Color</label>
+        <ColorPicker selected={f.color} onSelect={(c) => set({ color: c })} />
+      </div>
+
+      <div className="field">
+        <label className="field-label">Steps checklist (optional)</label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          {f.checklist.map((step, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: '7px 10px' }}>
+              <Grip size={13} color="var(--text-faint)" />
+              <input style={{ all: 'unset', flex: 1, fontSize: '0.85rem', fontWeight: 600 }} value={step} onChange={(e) => set({ checklist: f.checklist.map((x, xi) => (xi === i ? e.target.value : x)) })} />
+              <button className="btn btn-ghost btn-icon" style={{ width: 24, height: 24 }} onClick={() => set({ checklist: f.checklist.filter((_, xi) => xi !== i) })}><X size={13} /></button>
+            </div>
+          ))}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input className="input" placeholder="Add a step (e.g. Floss)" value={newStep} onChange={(e) => setNewStep(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && newStep.trim()) { set({ checklist: [...f.checklist, newStep.trim()] }); setNewStep(''); } }} />
+            <button className="btn" onClick={() => { if (newStep.trim()) { set({ checklist: [...f.checklist, newStep.trim()] }); setNewStep(''); } }}><Plus size={14} /></button>
+          </div>
+        </div>
+      </div>
+
+      <div className="field">
+        <label className="field-label">Tags (optional)</label>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          {f.tags.map((t) => (
+            <button key={t} className="chip on" style={{ cursor: 'pointer' }} onClick={() => set({ tags: f.tags.filter((x) => x !== t) })}>{t} <X size={10} /></button>
+          ))}
+          <input className="input" style={{ width: 130, padding: '6px 10px', fontSize: '0.8rem' }} placeholder="tag + Enter" value={newTag}
+            onChange={(e) => setNewTag(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && newTag.trim()) { if (!f.tags.includes(newTag.trim())) set({ tags: [...f.tags, newTag.trim()] }); setNewTag(''); } }} />
+        </div>
+      </div>
+    </Modal>
   );
 }

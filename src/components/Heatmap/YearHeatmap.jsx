@@ -1,225 +1,163 @@
-import React, { useMemo } from 'react';
-import { View, Text, Tooltip } from 'reshaped';
-import { getLast365Days, getLast7Days, getLast30Days, toStr, getWeeksFromDays, getCompletionIntensity, format, getMonthDays } from '../../lib/utils';
+import React, { useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useStore } from '../../lib/store';
-import DynIcon from '../Shared/DynIcon';
+import { toStr, getWeeksFromDays, getCompletionIntensity, getYearDays, getMonthDays, formatDisplay, getToday } from '../../lib/utils';
+import { MONTH_NAMES, DAY_NAMES } from '../../lib/constants';
 
-export default function YearHeatmap({ completions, habits, habitId, view = 'year' }) {
-  const { dayNotes } = useStore();
-  const noteDates = useMemo(() => new Set((dayNotes || []).map(n => n.date)), [dayNotes]);
+export default function YearHeatmap({ habitId = null, compact = false }) {
+  const { completions, habits, heatmapYear, setUI } = useStore();
+  const [view, setView] = useState('year');
+  const [month, setMonth] = useState(new Date().getMonth());
+  const [tip, setTip] = useState(null);
 
-  const days = useMemo(() => {
-    if (view === 'week') return getLast7Days();
-    if (view === 'month') return getLast30Days();
-    return getLast365Days();
-  }, [view]);
+  const year = habitId ? new Date().getFullYear() : heatmapYear;
+  const nowYear = new Date().getFullYear();
 
-  const weeks = useMemo(() => getWeeksFromDays(days), [days]);
-
-  const countMap = useMemo(() => {
+  const byDate = useMemo(() => {
     const map = {};
-    const filtered = habitId ? completions.filter(c => c.habit_id === habitId) : completions;
-    filtered.forEach(c => { map[c.date] = (map[c.date] || 0) + (c.count || 1); });
-    return map;
-  }, [completions, habitId]);
-
-  // Habits completed per day (for tooltip)
-  const dayHabits = useMemo(() => {
-    const map = {};
-    const filtered = habitId ? completions.filter(c => c.habit_id === habitId) : completions;
-    filtered.forEach(c => {
-      if (!map[c.date]) map[c.date] = [];
-      const h = habits?.find(ha => ha.id === c.habit_id);
-      if (h) map[c.date].push(h);
+    completions.forEach((c) => {
+      if (habitId && c.habit_id !== habitId) return;
+      // avoid habits log slips — don't paint them as "done"
+      const h = habits.find((x) => x.id === c.habit_id);
+      if (h?.habit_type === 'avoid') return;
+      map[c.date] = (map[c.date] || 0) + 1;
     });
     return map;
-  }, [completions, habits, habitId]);
+  }, [completions, habitId, habits]);
 
-  // Month labels
-  const monthLabels = useMemo(() => {
-    if (view !== 'year') return [];
-    const labels = [];
-    let lastMonth = -1;
-    days.forEach((date, index) => {
-      const month = date.getMonth();
-      if (month !== lastMonth) {
-        labels.push({ month: format(date, 'MMM'), index });
-        lastMonth = month;
-      }
-    });
-    return labels;
-  }, [days, view]);
+  const showTip = (e, ds, count) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    setTip({ x: r.left + r.width / 2, y: r.top - 8, text: count ? `${count} ${count === 1 ? 'completion' : 'completions'} · ${formatDisplay(ds)}` : `No completions · ${formatDisplay(ds)}` });
+  };
 
-  const dayLabels = view === 'year' ? ['', 'Mon', '', 'Wed', '', 'Fri', ''] : [];
-  const totalCompletions = Object.values(countMap).reduce((a, b) => a + b, 0);
-  const activeDays = Object.keys(countMap).length;
+  const clickDay = (ds) => {
+    if (ds > getToday()) return;
+    setUI({ showDayNoteModal: true, dayNoteDate: ds });
+  };
 
-  function getTooltipContent(date) {
-    const ds = toStr(date);
-    const count = countMap[ds] || 0;
-    const dateStr = format(date, 'EEEE, MMM d, yyyy');
-    const hasNote = noteDates.has(ds);
-    const habitsOnDay = dayHabits[ds] || [];
+  const total = useMemo(() => Object.entries(byDate).filter(([d]) => habitId || getYearOf(d) === year).reduce((a, [, v]) => a + v, 0), [byDate, year, habitId]);
 
+  const cell = (d, i) => {
+    if (!d) return <div key={`e${i}`} className="heat-cell" style={{ visibility: 'hidden' }} />;
+    const ds = toStr(d);
+    const count = byDate[ds] || 0;
+    const future = ds > getToday();
+    const cls = `heat-cell l${getCompletionIntensity(count)}${ds === getToday() ? ' today' : ''}${future ? ' future' : ''}${!habitId && d.getFullYear() !== year ? ' other-year' : ''}`;
     return (
-      <div style={{ maxWidth: 220 }}>
-        <div style={{ fontWeight: 600, marginBottom: 4 }}>{dateStr}</div>
-        <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>
-          {count === 0 ? 'No completions' : `${count} completion${count > 1 ? 's' : ''}`}
-        </div>
-        {habitsOnDay.length > 0 && (
-          <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-            {habitsOnDay.slice(0, 6).map(h => (
-              <span key={h.id} style={{
-                display: 'inline-flex', alignItems: 'center', gap: 2,
-                padding: '1px 6px', borderRadius: 6, fontSize: '0.65rem',
-                background: `${h.color}30`, color: 'white',
-              }}>
-                {h.name}
-              </span>
-            ))}
-          </div>
-        )}
-        {hasNote && (
-          <div style={{ marginTop: 4, fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: 3, opacity: 0.8 }}>
-            <DynIcon name="StickyNote" size={10} /> Has a note
-          </div>
-        )}
-      </div>
+      <div
+        key={ds}
+        className={cls}
+        onMouseEnter={(e) => !future && showTip(e, ds, count)}
+        onMouseLeave={() => setTip(null)}
+        onClick={() => clickDay(ds)}
+      />
     );
-  }
+  };
+
+  const years = [];
+  const earliest = useMemo(() => {
+    let min = nowYear;
+    completions.forEach((c) => { const y = getYearOf(c.date); if (y < min) min = y; });
+    habits.forEach((h) => { const y = new Date(h.created_at).getFullYear(); if (y < min) min = y; });
+    return min;
+  }, [completions, habits, nowYear]);
+  for (let y = nowYear; y >= earliest; y--) years.push(y);
 
   return (
-    <View padding={4} style={{
-      background: 'var(--rs-color-background-neutral-default)',
-      border: '1px solid var(--rs-color-border-neutral-faded)',
-      borderRadius: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-    }}>
-      {/* Stats summary */}
-      <View direction="row" gap={6} marginBottom={3} style={{ justifyContent: 'flex-end' }}>
-        <View direction="row" gap={1} align="center">
-          <Text variant="caption-1" color="neutral-faded">Total:</Text>
-          <Text variant="caption-1" weight="bold">{totalCompletions}</Text>
-        </View>
-        <View direction="row" gap={1} align="center">
-          <Text variant="caption-1" color="neutral-faded">Active days:</Text>
-          <Text variant="caption-1" weight="bold">{activeDays}</Text>
-        </View>
-        {days.length > 0 && (
-          <View direction="row" gap={1} align="center">
-            <Text variant="caption-1" color="neutral-faded">Rate:</Text>
-            <Text variant="caption-1" weight="bold">{Math.round((activeDays / days.length) * 100)}%</Text>
-          </View>
-        )}
-      </View>
-
-      {/* Month labels */}
-      {monthLabels.length > 0 && (
-        <div style={{ display: 'flex', marginLeft: 32, marginBottom: 4, position: 'relative', height: 16 }}>
-          {monthLabels.map((label, i) => (
-            <span key={i} style={{
-              position: 'absolute', left: label.index * 16,
-              fontSize: '0.625rem', color: 'var(--rs-color-foreground-neutral-faded)',
-            }}>{label.month}</span>
-          ))}
+    <div>
+      {!compact && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden' }}>
+            <button className="btn btn-sm" style={{ border: 0, borderRadius: 0, background: view === 'year' ? 'var(--accent-soft)' : 'transparent', fontWeight: 700 }} onClick={() => setView('year')}>Year</button>
+            <button className="btn btn-sm" style={{ border: 0, borderLeft: '1px solid var(--border)', borderRadius: 0, background: view === 'month' ? 'var(--accent-soft)' : 'transparent', fontWeight: 700 }} onClick={() => setView('month')}>Month</button>
+          </div>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
+            {view === 'month' ? (
+              <>
+                <button className="btn btn-icon btn-sm" onClick={() => { if (month === 0) { setMonth(11); } else setMonth((m) => m - 1); }}><ChevronLeft size={14} /></button>
+                <span style={{ fontWeight: 800, fontSize: '0.85rem', minWidth: 110, textAlign: 'center' }}>{MONTH_NAMES[month]} {year}</span>
+                <button className="btn btn-icon btn-sm" onClick={() => { if (month === 11) { setMonth(0); } else setMonth((m) => m + 1); }}><ChevronRight size={14} /></button>
+              </>
+            ) : (
+              <>
+                <button className="btn btn-icon btn-sm" disabled={year <= earliest} onClick={() => setUI({ heatmapYear: year - 1 })}><ChevronLeft size={14} /></button>
+                <span style={{ fontWeight: 800, fontSize: '0.85rem', minWidth: 60, textAlign: 'center' }}>{year}</span>
+                <button className="btn btn-icon btn-sm" disabled={year >= nowYear} onClick={() => setUI({ heatmapYear: year + 1 })}><ChevronRight size={14} /></button>
+              </>
+            )}
+            <span className="chip" style={{ marginLeft: 8 }}>{total} total</span>
+          </div>
         </div>
       )}
 
-      {/* Heatmap grid */}
-      <div className="heatmap-wrap">
-        <div style={{ display: 'flex', gap: 4 }}>
-          {/* Day labels */}
-          {dayLabels.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 28 }}>
-              {dayLabels.map((label, i) => (
-                <div key={i} style={{
-                  height: 13, fontSize: '0.6rem', color: 'var(--rs-color-foreground-neutral-faded)',
-                  display: 'flex', alignItems: 'center', lineHeight: '13px'
-                }}>{label}</div>
-              ))}
-            </div>
-          )}
-
-          {/* Weeks/Days */}
-          {view === 'year' ? (
-            <div className="heatmap-grid">
-              {weeks.map((week, wi) => (
-                <div key={wi} className="heatmap-week">
-                  {week.map((date, di) => {
-                    if (!date) return <div key={di} className="heatmap-cell" style={{ visibility: 'hidden' }} />;
-                    const ds = toStr(date);
-                    const count = countMap[ds] || 0;
-                    const level = getCompletionIntensity(count);
-                    const hasNote = noteDates.has(ds);
-                    return (
-                      <Tooltip key={di} text={getTooltipContent(date)} position="top">
-                        <div className={`heatmap-cell heatmap-l${level}`} style={{
-                          position: 'relative',
-                          ...(hasNote ? { boxShadow: 'inset 0 0 0 1px #f59e0b' } : {}),
-                        }} />
-                      </Tooltip>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          ) : (
-            // Week or Month view - horizontal row
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {days.map((date) => {
-                const ds = toStr(date);
-                const count = countMap[ds] || 0;
-                const level = getCompletionIntensity(count);
-                const isToday = ds === toStr(new Date());
-                const hasNote = noteDates.has(ds);
-                return (
-                  <Tooltip key={ds} text={getTooltipContent(date)} position="top">
-                    <div style={{
-                      width: view === 'week' ? 56 : 32,
-                      height: view === 'week' ? 56 : 32,
-                      borderRadius: view === 'week' ? 14 : 8,
-                      display: 'flex', flexDirection: 'column',
-                      alignItems: 'center', justifyContent: 'center',
-                      cursor: 'pointer', transition: 'all 0.15s',
-                      border: isToday ? '2px solid #22c55e' : '1px solid transparent',
-                      boxShadow: hasNote ? 'inset 0 0 0 1px #f59e0b' : 'none',
-                      background: level === 0 ? 'var(--rs-color-background-neutral-faded)' :
-                        level === 1 ? '#bbf7d0' : level === 2 ? '#4ade80' : level === 3 ? '#16a34a' : '#166534',
-                    }}>
-                      <span style={{
-                        fontSize: view === 'week' ? '0.65rem' : '0.55rem',
-                        fontWeight: 600, color: level >= 3 ? 'white' : 'var(--rs-color-foreground-neutral-faded)',
-                        textTransform: 'uppercase',
-                      }}>{format(date, 'EEE')}</span>
-                      <span style={{
-                        fontSize: view === 'week' ? '1.125rem' : '0.75rem',
-                        fontWeight: 800, color: level >= 3 ? 'white' : 'var(--rs-color-foreground-neutral-default)',
-                      }}>{format(date, 'd')}</span>
-                      {count > 0 && (
-                        <span style={{
-                          fontSize: '0.55rem', fontWeight: 700,
-                          color: level >= 3 ? 'rgba(255,255,255,0.8)' : 'var(--rs-color-foreground-neutral-faded)',
-                        }}>{count}</span>
-                      )}
+      <div className="heat-scroll">
+        {view === 'year' || compact ? (
+          <div className="heat-wrap">
+            {(() => {
+              const weeks = getWeeksFromDays(getYearDays(year));
+              // month label per column: first week whose leading day starts a new month
+              const colLabels = weeks.map((w) => {
+                const firstReal = w.find(Boolean);
+                if (!firstReal) return null;
+                const m = firstReal.getMonth();
+                const day = firstReal.getDate();
+                return day <= 7 ? MONTH_NAMES[m].slice(0, 3) : null;
+              });
+              let lastShown = -1;
+              const labels = colLabels.map((l, i) => {
+                if (!l) return '';
+                if (i - lastShown < 4) return '';
+                lastShown = i;
+                return l;
+              });
+              return (
+                <>
+                  <div style={{ display: 'flex', gap: 3, marginLeft: 36 }}>
+                    {labels.map((l, i) => <div key={i} className="heat-month" style={{ width: 13 }}>{l}</div>)}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, paddingTop: 17, justifyContent: 'flex-start' }}>
+                      {DAY_NAMES.map((d, i) => <div key={i} style={{ height: 13, fontSize: '0.58rem', fontWeight: 700, color: 'var(--text-faint)', width: 30, textAlign: 'right' }}>{i % 2 ? d : ''}</div>)}
                     </div>
-                  </Tooltip>
-                );
-              })}
+                    <div style={{ display: 'flex', gap: 3 }}>
+                      {weeks.map((w, wi) => (
+                        <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>{w.map((d, i) => cell(d, wi * 7 + i))}</div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        ) : (
+          <div className="heat-wrap">
+            <div style={{ display: 'flex', gap: 3 }}>
+              {getWeeksFromDays(getMonthDays(year, month)).map((w, wi) => (
+                <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>{w.map((d, di) => d ? <div key={toStr(d)} style={{ width: 16, height: 16, borderRadius: 5, fontSize: '0.55rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', background: byDate[toStr(d)] ? 'var(--accent)' : 'var(--surface-3)', color: byDate[toStr(d)] ? '#fff' : 'var(--text-faint)', cursor: toStr(d) <= getToday() ? 'pointer' : 'default' }} onClick={() => clickDay(toStr(d))}>{d.getDate()}</div> : <div key={`e${wi}-${di}`} style={{ visibility: 'hidden', width: 16, height: 16 }} />)}</div>
+              ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Legend */}
-      {view === 'year' && (
-        <View direction="row" align="center" gap={1} marginTop={3} style={{ justifyContent: 'flex-end' }}>
-          <Text variant="caption-2" color="neutral-faded">Less</Text>
-          {[0, 1, 2, 3, 4].map(l => (
-            <div key={l} className={`heatmap-cell heatmap-l${l}`} style={{ width: 11, height: 11 }} />
-          ))}
-          <Text variant="caption-2" color="neutral-faded">More</Text>
-        </View>
-      )}
-    </View>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginTop: 10, gap: 12, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '0.68rem', color: 'var(--text-faint)', fontWeight: 600, marginRight: 'auto' }}>Click any day to add a note</span>
+        <div className="heat-legend">Less <div className="heat-cell" /> <div className="heat-cell l1" /> <div className="heat-cell l2" /> <div className="heat-cell l3" /> <div className="heat-cell l4" /> More</div>
+      </div>
+
+      {tip && <div className="tooltip" style={{ left: tip.x, top: tip.y, transform: 'translate(-50%, -100%)' }}>{tip.text}</div>}
+    </div>
   );
+}
+
+function getYearOf(ds) { return Number(ds.slice(0, 4)); }
+
+function monthLabels(year) {
+  const labels = [];
+  for (let m = 0; m < 12; m++) {
+    const days = getMonthDays(year, m);
+    const firstIdx = Math.floor(days[0].getTime()) ;
+    labels.push({ label: MONTH_NAMES[m][0], span: Math.ceil(days.length / 7) });
+  }
+  return labels.filter((l) => l.label);
 }

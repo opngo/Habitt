@@ -1,148 +1,108 @@
-// Export journal and habit data to Obsidian-compatible Markdown
-import { format, parseISO } from 'date-fns';
+// Export Habitt data as an Obsidian-friendly set of Markdown notes (single file,
+// with `%% ── FILE: ... ── %%` separators so it can be split, or used as-is).
+import { format } from 'date-fns';
+import { toDate } from './utils';
 
-const toDate = (d) => typeof d === 'string' ? parseISO(d + (d.length === 10 ? 'T12:00:00' : '')) : d;
+const MOODS = { 1: '😢 Terrible', 2: '😕 Bad', 3: '😐 Okay', 4: '😊 Good', 5: '🤩 Amazing' };
+const ENERGY = { 1: 'Exhausted', 2: 'Low', 3: 'Normal', 4: 'High', 5: 'Supercharged' };
 
-const moods = { 1: 'Terrible', 2: 'Bad', 3: 'Okay', 4: 'Good', 5: 'Amazing' };
-const moodEmoji = { 1: '😢', 2: '😕', 3: '😐', 4: '😊', 5: '🤩' };
-const energyLabels = { 1: 'Exhausted', 2: 'Low', 3: 'Normal', 4: 'High', 5: 'Supercharged' };
-
-export function generateDailyNote(entry, habitsCompleted, tasksCompleted, tags = []) {
-  const date = toDate(entry.date);
-  const dateStr = format(date, 'yyyy-MM-dd');
-  const allTags = ['daily', ...tags, ...(entry.tags || [])];
-
-  let md = `---
-date: "${dateStr}"
-tags: [${allTags.map(t => `"${t}"`).join(', ')}]
-mood: ${entry.mood || 3}
-energy: ${entry.energy || 3}
-`;
-
+function dailyNote(entry, habitsDone, dateStr) {
+  const d = toDate(entry.date);
+  let md = '---\n';
+  md += `date: "${format(d, 'yyyy-MM-dd')}"\n`;
+  md += `tags: ["daily"${(entry.tags || []).map((t) => `, "${t}"`).join('')}]\n`;
+  md += `mood: ${entry.mood || 3}\nenergy: ${entry.energy || 3}\n`;
   if (entry.sleep_hours) md += `sleep: ${entry.sleep_hours}\n`;
-  md += `---\n\n`;
-  md += `# ${format(date, 'EEEE, MMMM d, yyyy')}\n\n`;
-
-  // Mood & Energy
-  md += `## Check-in\n\n`;
-  md += `| Mood | Energy | Sleep |\n`;
-  md += `|------|--------|-------|\n`;
-  md += `| ${moodEmoji[entry.mood] || '😐'} ${moods[entry.mood] || 'Okay'} | ${energyLabels[entry.energy] || 'Normal'} | ${entry.sleep_hours || '?'}h |\n\n`;
-
-  // Journal content
-  if (entry.content) {
-    md += `## Journal\n\n${entry.content}\n\n`;
+  md += '---\n\n';
+  md += `# ${format(d, 'EEEE, MMMM d, yyyy')}\n\n`;
+  md += '## Check-in\n\n| Mood | Energy | Sleep | Habits |\n|---|---|---|---|\n';
+  md += `| ${MOODS[entry.mood] || '😐 Okay'} | ${ENERGY[entry.energy] || 'Normal'} | ${entry.sleep_hours || '?'}h | ${habitsDone.length} done |\n\n`;
+  if (habitsDone.length) {
+    md += '## Habits\n\n' + habitsDone.map((h) => `- [x] ${h.name}`).join('\n') + '\n\n';
   }
-
-  // Gratitude
-  if (entry.gratitude) {
-    md += `## Gratitude\n\n${entry.gratitude}\n\n`;
-  }
-
-  // Habits completed
-  if (habitsCompleted?.length > 0) {
-    md += `## Habits\n\n`;
-    habitsCompleted.forEach(h => {
-      md += `- [x] ${h.name}\n`;
-    });
-    md += `\n`;
-  }
-
-  // Tasks completed
-  if (tasksCompleted?.length > 0) {
-    md += `## Tasks\n\n`;
-    tasksCompleted.forEach(t => {
-      md += `- [x] ${t.title}\n`;
-    });
-    md += `\n`;
-  }
-
-  // AI Summary
-  if (entry.ai_summary) {
-    md += `## AI Reflection\n\n> ${entry.ai_summary}\n\n`;
-  }
-
+  if (entry.content) md += `## Journal\n\n${entry.content}\n\n`;
+  if (entry.gratitude) md += `## Gratitude\n\n${entry.gratitude}\n\n`;
+  if (entry.ai_summary) md += `## Reflection\n\n> ${entry.ai_summary}\n`;
   return md;
 }
 
-export function generateMoodJournal(entries) {
-  let md = `---
-tags: ["mood-journal", "review"]
-generated: "${format(new Date(), 'yyyy-MM-dd')}"
----
+export function buildVault({ journalEntries, habits, completions, tasks, notes, dayNotes, focusSessions }) {
+  const files = [];
+  const byDate = (date) => habits.filter((h) => completions.some((c) => c.habit_id === h.id && c.date === date));
 
-# Mood Journal\n\n`;
+  for (const e of [...journalEntries].sort((a, b) => a.date.localeCompare(b.date))) {
+    files.push({ path: `Daily/${e.date}.md`, content: dailyNote(e, byDate(e.date), e.date) });
+  }
 
-  entries.sort((a, b) => b.date.localeCompare(a.date)).forEach(entry => {
-    const date = toDate(entry.date);
-    md += `## ${format(date, 'MMM d, yyyy')}\n\n`;
-    md += `**Mood:** ${moodEmoji[entry.mood]} ${moods[entry.mood]} (${entry.mood}/5)\n`;
-    if (entry.content) md += `\n${entry.content}\n`;
-    md += `\n---\n\n`;
+  // Day notes without a journal entry
+  const journalDates = new Set(journalEntries.map((e) => e.date));
+  for (const n of [...dayNotes].sort((a, b) => a.date.localeCompare(b.date))) {
+    if (journalDates.has(n.date)) continue;
+    files.push({
+      path: `Daily/${n.date}.md`,
+      content: `---\ndate: "${n.date}"\ntags: ["daily"]\n---\n\n# ${format(toDate(n.date), 'EEEE, MMMM d, yyyy')}\n\n${n.content}\n`,
+    });
+  }
+
+  for (const h of habits) {
+    const done = completions.filter((c) => c.habit_id === h.id).map((c) => c.date).sort();
+    let md = `---\ntags: ["habit", "${h.category}"]\ncolor: ${h.color}\ncreated: ${String(h.created_at).slice(0, 10)}\n---\n\n`;
+    md += `# ${h.name}\n\n${h.description || ''}\n\n**Category:** ${h.category} · **Type:** ${h.habit_type} · **Schedule:** ${h.schedule_type || h.frequency || 'daily'}\n\n`;
+    md += `Total: **${done.length}** completions\n\n## History\n\n` + (done.length ? done.map((d) => `- [x] ${d}`).join('\n') : '_No entries yet._');
+    files.push({ path: `Habits/${h.name.replace(/[\\/:*?"<>|#^\[\]]/g, '')}.md`, content: md });
+  }
+
+  const open = tasks.filter((t) => t.status !== 'done' && !t.parent_id);
+  const done = tasks.filter((t) => t.status === 'done' || t.parent_id);
+  files.push({
+    path: 'Tasks.md',
+    content:
+      `---\ntags: ["tasks"]\n---\n\n# Tasks\n\n## Open\n\n` +
+      (open.length ? open.map((t) => `- [ ] ${t.title}${t.due_date ? ` 📅 ${t.due_date}` : ''}`).join('\n') : '_None_') +
+      `\n\n## Completed\n\n` + (done.length ? done.map((t) => `- [x] ${t.title}`).join('\n') : '_None_'),
   });
 
-  return md;
-}
-
-export function generateHabitReview(habits, completions, year) {
-  let md = `---
-tags: ["habit-review", "${year}"]
----
-
-# Habit Review ${year}\n\n`;
-
-  habits.forEach(h => {
-    const hc = completions.filter(c => c.habit_id === h.id && c.date.startsWith(String(year)));
-    const rate = hc.length > 0 ? Math.round((hc.length / 365) * 100) : 0;
-
-    md += `## ${h.name}\n\n`;
-    md += `| Category | Type | Completions | Rate |\n`;
-    md += `|----------|------|-------------|------|\n`;
-    md += `| ${h.category} | ${h.habit_type || 'normal'} | ${hc.length} | ${rate}% |\n\n`;
+  files.push({
+    path: 'Notes.md',
+    content: `---\ntags: ["notes"]\n---\n\n# Notes\n\n` +
+      (notes.length ? notes.map((n) => `## ${n.title}\n\n${n.content}\n`).join('\n---\n\n') : '_No notes yet._'),
   });
 
-  return md;
+  const focusTotal = focusSessions.reduce((a, f) => a + (f.duration_minutes || 0), 0);
+  files.push({
+    path: 'Focus.md',
+    content: `---\ntags: ["focus"]\ntotal_minutes: ${focusTotal}\n---\n\n# Focus Sessions\n\n- **Sessions:** ${focusSessions.length}\n- **Total time:** ${Math.round(focusTotal / 60)}h ${focusTotal % 60}m\n`,
+  });
+
+  const dash =
+    `---\ntags: ["dashboard"]\n---\n\n# Habitt — Dashboard\n\n` +
+    `| Area | Count |\n|---|---|\n` +
+    `| Habits | ${habits.length} |\n| Completions | ${completions.length} |\n| Journal entries | ${journalEntries.length} |\n| Notes | ${notes.length} |\n| Focus minutes | ${focusTotal} |\n`;
+  files.unshift({ path: '00 Dashboard.md', content: dash });
+
+  return files;
 }
 
-// Download as file
-export function downloadMarkdown(content, filename) {
-  const blob = new Blob([content], { type: 'text/markdown' });
-  const url = URL.createObjectURL(blob);
+export function vaultToMarkdown(files) {
+  return files.map((f) => `%% ── FILE: ${f.path} ── %%\n\n${f.content.trim()}\n`).join('\n---\n\n');
+}
+
+export function download(filename, text, mime = 'text/markdown') {
+  let url;
+  let revoke = () => {};
+  try {
+    const blob = new Blob([text], { type: mime });
+    url = URL.createObjectURL(blob);
+    revoke = () => URL.revokeObjectURL(url);
+  } catch {
+    // environments without object URLs (tests, locked-down webviews): data URI
+    url = `data:${mime};charset=utf-8,` + encodeURIComponent(text);
+  }
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
-}
-
-// Download as zip (multiple files)
-export async function downloadObsidianVault(entries, habits, completions, tasks) {
-  // Generate individual daily notes
-  const files = {};
-  entries.forEach(entry => {
-    const habitsCompleted = habits.filter(h =>
-      completions.some(c => c.habit_id === h.id && c.date === entry.date)
-    );
-    const tasksCompleted = (tasks || []).filter(t =>
-      t.completed_at && t.completed_at.startsWith(entry.date)
-    );
-    const filename = `Daily Notes/${entry.date}.md`;
-    files[filename] = generateDailyNote(entry, habitsCompleted, tasksCompleted);
-  });
-
-  // Generate mood journal
-  files['Mood Journal.md'] = generateMoodJournal(entries);
-
-  // Generate habit review
-  const year = new Date().getFullYear();
-  files[`Habit Review ${year}.md`] = generateHabitReview(habits, completions, year);
-
-  // Download as JSON (user can use a script to convert to files)
-  const blob = new Blob([JSON.stringify(files, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `obsidian-vault-${format(new Date(), 'yyyy-MM-dd')}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+  a.remove();
+  setTimeout(revoke, 4000);
 }

@@ -1,269 +1,170 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, Button, Icon } from 'reshaped';
-import { X, Play, Pause, RotateCcw, Timer, Coffee, Zap, VolumeX, Volume2, Check, SkipForward } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Play, Pause, Square, SkipForward, Timer, Volume2, VolumeX, Coffee, Brain } from 'lucide-react';
 import { useStore } from '../../lib/store';
-import { saveFocusSession } from '../../lib/db';
 import { FOCUS_PRESETS, FOCUS_SOUNDS } from '../../lib/constants';
-import DynIcon from '../Shared/DynIcon';
+import Modal from './Modal';
+import DynIcon from './DynIcon';
 
-export default function FocusTimer({ refreshData }) {
-  const { habits, setShowFocusTimer, focusTimerHabitId, addToast, addXp, unlockAchievement, focusSessions } = useStore();
-
+export default function FocusTimer() {
+  const { timer, setUI, startTimer, pauseResumeTimer, timerSkip, stopTimer, setTimerSound, habits, focusSessions } = useStore();
   const [preset, setPreset] = useState(FOCUS_PRESETS[0]);
-  const [timeLeft, setTimeLeft] = useState(preset.work * 60);
-  const [isRunning, setIsRunning] = useState(false);
-  const [phase, setPhase] = useState('work'); // 'work', 'shortBreak', 'longBreak'
-  const [currentRound, setCurrentRound] = useState(1);
-  const [totalFocused, setTotalFocused] = useState(0);
-  const [sound, setSound] = useState(FOCUS_SOUNDS[0]);
-  const [showSettings, setShowSettings] = useState(false);
+  const [custom, setCustom] = useState({ work: 25, shortBreak: 5, longBreak: 15, rounds: 4 });
+  const [habitId, setHabitId] = useState(useStore.getState().focusTimerHabitId || '');
+  const [now, setNow] = useState(Date.now());
+  const [volume, setVolume] = useState(0.5);
 
-  const intervalRef = useRef(null);
-  const startTimeRef = useRef(null);
-  const habit = habits.find(h => h.id === focusTimerHabitId);
-
-  // Timer tick
+  // 250ms clock for display
   useEffect(() => {
-    if (isRunning && timeLeft > 0) {
-      intervalRef.current = setInterval(() => {
-        setTimeLeft(t => t - 1);
-      }, 1000);
-    } else if (timeLeft === 0 && isRunning) {
-      handlePhaseComplete();
-    }
-    return () => clearInterval(intervalRef.current);
-  }, [isRunning, timeLeft]);
+    const id = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(id);
+  }, []);
 
-  function handlePhaseComplete() {
-    setIsRunning(false);
-    clearInterval(intervalRef.current);
-
-    if (phase === 'work') {
-      const durationMin = preset.work;
-      setTotalFocused(t => t + durationMin);
-
-      // Save session
-      saveFocusSession({
-        habit_id: focusTimerHabitId,
-        started_at: startTimeRef.current || new Date().toISOString(),
-        duration_minutes: durationMin,
-        completed: true,
-        notes: `Round ${currentRound}/${preset.rounds}`,
-      });
-
-      addXp(15);
-      addToast({ type: 'success', message: `Focus session complete! +15 XP` });
-
-      if (focusSessions.length === 0) unlockAchievement('focus_session');
-      if (focusSessions.length >= 9) unlockAchievement('focus_10');
-
-      // Move to break
-      if (currentRound >= preset.rounds) {
-        setPhase('longBreak');
-        setTimeLeft(preset.longBreak * 60);
-      } else {
-        setPhase('shortBreak');
-        setTimeLeft(preset.shortBreak * 60);
-      }
+  // ambient sound sync
+  useEffect(() => {
+    const kind = timer?.running ? (FOCUS_SOUNDS.find((s) => s.name === timer.sound)?.type || null) : null;
+    if (kind) {
+      import('../../lib/sound').then((m) => { m.ambient.start(kind, volume); });
     } else {
-      // Break is over, back to work
-      if (phase === 'longBreak') {
-        setCurrentRound(1);
-      } else {
-        setCurrentRound(r => r + 1);
-      }
-      setPhase('work');
-      setTimeLeft(preset.work * 60);
+      import('../../lib/sound').then((m) => m.ambient.stop());
     }
-  }
+    return () => { import('../../lib/sound').then((m) => m.ambient.stop()); };
+  }, [timer?.sound, timer?.running, volume]);
 
-  function toggleTimer() {
-    if (!isRunning) {
-      startTimeRef.current = new Date().toISOString();
-    }
-    setIsRunning(!isRunning);
-  }
+  const secs = useMemo(() => {
+    if (!timer) return { left: preset.work * 60, total: preset.work * 60 };
+    const msLeft = timer.running ? Math.max(0, timer.endsAt - now) : (timer.remainingMs || 0);
+    const totalMin = timer.phase === 'work' ? timer.preset.work : (timer.breakKind === 'long' ? timer.preset.longBreak : timer.preset.shortBreak);
+    return { left: Math.ceil(msLeft / 1000), total: totalMin * 60 };
+  }, [timer, now, preset]);
 
-  function resetTimer() {
-    setIsRunning(false);
-    clearInterval(intervalRef.current);
-    setTimeLeft(preset.work * 60);
-    setPhase('work');
-    setCurrentRound(1);
-    setTotalFocused(0);
-  }
+  const mm = String(Math.floor(secs.left / 60)).padStart(2, '0');
+  const ss = String(secs.left % 60).padStart(2, '0');
+  const frac = timer ? 1 - secs.left / Math.max(1, secs.total) : 0;
+  const R = 105, C = 2 * Math.PI * R;
+  const ringColor = !timer ? 'var(--accent)' : timer.phase === 'work' ? 'var(--accent)' : 'var(--cyan)';
+  const todayMin = focusSessions.filter((f) => (f.started_at || '').slice(0, 10) === new Date().toISOString().slice(0, 10)).reduce((a, f) => a + (f.duration_minutes || 0), 0);
 
-  function skipPhase() {
-    handlePhaseComplete();
-  }
-
-  function changePreset(p) {
-    setPreset(p);
-    setTimeLeft(p.work * 60);
-    setPhase('work');
-    setCurrentRound(1);
-    setIsRunning(false);
-  }
-
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
-  const totalTime = phase === 'work' ? preset.work * 60 : phase === 'shortBreak' ? preset.shortBreak * 60 : preset.longBreak * 60;
-  const progress = ((totalTime - timeLeft) / totalTime) * 100;
-
-  const phaseColors = {
-    work: '#22c55e',
-    shortBreak: '#3b82f6',
-    longBreak: '#8b5cf6',
-  };
-
-  const phaseLabels = {
-    work: 'Focus Time',
-    shortBreak: 'Short Break',
-    longBreak: 'Long Break',
-  };
-
-  const phaseIcons = {
-    work: 'Focus',
-    shortBreak: 'Coffee',
-    longBreak: 'Sparkles',
+  const start = () => {
+    const p = preset.name === 'Custom' ? { name: 'Custom', ...custom } : preset;
+    startTimer(p, habitId || null);
   };
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-      backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center',
-      justifyContent: 'center', zIndex: 10000,
-    }} onClick={(e) => e.target === e.currentTarget && setShowFocusTimer(false)}>
-      <div className="animate-scale-in" style={{
-        background: 'var(--rs-color-background-neutral-default)',
-        borderRadius: 24, width: '100%', maxWidth: 440,
-        boxShadow: '0 32px 80px rgba(0,0,0,0.2)',
-        overflow: 'hidden',
-      }}>
-        {/* Header */}
-        <View direction="row" align="center" padding={4} style={{
-          justifyContent: 'space-between',
-          borderBottom: '1px solid var(--rs-color-border-neutral-faded)',
-        }}>
-          <View direction="row" gap={2} align="center">
-            <Timer size={18} color={phaseColors[phase]} />
-            <Text variant="title-3" weight="bold">Focus Timer</Text>
-          </View>
-          <button onClick={() => setShowFocusTimer(false)} style={{
-            width: 32, height: 32, borderRadius: 10, border: 'none', cursor: 'pointer',
-            background: 'var(--rs-color-background-neutral-faded)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}><X size={16} /></button>
-        </View>
+    <Modal
+      title="Focus timer"
+      icon={<Timer size={18} color="var(--accent)" />}
+      onClose={() => setUI({ showFocusTimer: false })}
+      footer={timer ? (
+        <>
+          <span style={{ marginRight: 'auto', fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 650 }}>
+            Round {timer.round}/{timer.preset.rounds} · {timer.phase === 'work' ? 'focus' : 'break'} · {todayMin} min focused today
+          </span>
+          <button className="btn" onClick={timerSkip} title="Skip this phase"><SkipForward size={14} /></button>
+          <button className="btn btn-danger" onClick={() => stopTimer()}><Square size={13} /> Stop</button>
+          <button className="btn btn-primary" onClick={pauseResumeTimer}>{timer.running ? <><Pause size={14} /> Pause</> : <><Play size={14} /> Resume</>}</button>
+        </>
+      ) : (
+        <>
+          <span style={{ marginRight: 'auto', fontSize: '0.78rem', color: 'var(--text-faint)', fontWeight: 650 }}>{todayMin} min focused today</span>
+          <button className="btn" onClick={() => setUI({ showFocusTimer: false })}>Close</button>
+          <button className="btn btn-primary" onClick={start}><Play size={14} /> Start</button>
+        </>
+      )}
+    >
+      {/* ring */}
+      <div className="focus-ring-wrap">
+        <svg width="240" height="240" viewBox="0 0 240 240">
+          <circle cx="120" cy="120" r={R} stroke="var(--surface-3)" strokeWidth="11" fill="none" />
+          <circle cx="120" cy="120" r={R} stroke={ringColor} strokeWidth="11" fill="none" strokeLinecap="round"
+            strokeDasharray={C} strokeDashoffset={C * (1 - Math.max(0, Math.min(1, frac)))} style={{ transition: 'stroke-dashoffset 0.25s linear' }} />
+        </svg>
+        <div className="focus-center">
+          <div style={{ display: 'flex', gap: 5, alignItems: 'center', color: 'var(--text-faint)', fontWeight: 750, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+            {timer?.phase === 'break' ? <Coffee size={13} color="var(--cyan)" /> : <Brain size={13} color="var(--accent)" />}
+            {timer ? (timer.phase === 'work' ? 'Deep focus' : 'Break') : 'Ready'}
+          </div>
+          <div className="focus-time">{mm}:{ss}</div>
+          {(() => {
+            const hb = timer ? habits.find((h) => h.id === timer.habitId) : habits.find((h) => h.id === habitId);
+            return hb ? <span className="chip" style={{ color: hb.color }}><DynIcon name={hb.icon} size={11} /> {hb.name}</span> : null;
+          })()}
+        </div>
+      </div>
 
-        {/* Timer Circle */}
-        <View align="center" padding={6} style={{ position: 'relative' }}>
-          {/* Habit name */}
-          {habit && (
-            <View direction="row" gap={2} align="center" marginBottom={4}>
-              <DynIcon name={habit.icon} size={16} color={habit.color} />
-              <Text variant="body-2" weight="bold">{habit.name}</Text>
-            </View>
-          )}
-
-          {/* Circle progress */}
-          <div style={{ position: 'relative', width: 200, height: 200 }}>
-            <svg width="200" height="200" viewBox="0 0 200 200" style={{ transform: 'rotate(-90deg)' }}>
-              <circle cx="100" cy="100" r="88" fill="none" stroke="var(--rs-color-background-neutral-faded)" strokeWidth="8" />
-              <circle cx="100" cy="100" r="88" fill="none" stroke={phaseColors[phase]} strokeWidth="8"
-                strokeLinecap="round"
-                strokeDasharray={2 * Math.PI * 88}
-                strokeDashoffset={2 * Math.PI * 88 * (1 - progress / 100)}
-                style={{ transition: 'stroke-dashoffset 1s linear' }}
-              />
-            </svg>
-            <div style={{
-              position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Text variant="display-1" weight="bold" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
-              </Text>
-              <View direction="row" gap={1} align="center" marginTop={1}>
-                <DynIcon name={phaseIcons[phase]} size={14} color={phaseColors[phase]} />
-                <Text variant="caption-1" color="neutral-faded" weight="bold">{phaseLabels[phase]}</Text>
-              </View>
+      {!timer && (
+        <>
+          <div className="field">
+            <label className="field-label">Preset</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(105px, 1fr))', gap: 7 }}>
+              {FOCUS_PRESETS.map((p) => (
+                <button key={p.name} className={`mood-btn ${preset.name === p.name ? 'on' : ''}`} style={preset.name === p.name ? { borderColor: 'var(--accent)', background: 'var(--accent-soft)' } : {}} onClick={() => setPreset(p)}>
+                  <DynIcon name={p.icon} size={16} color={preset.name === p.name ? 'var(--accent)' : undefined} />
+                  <span style={{ fontWeight: 800 }}>{p.name}</span>
+                  <span style={{ fontSize: '0.6rem', color: 'var(--text-faint)' }}>{p.work}m / {p.shortBreak}m · ×{p.rounds}</span>
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Round indicator */}
-          <View direction="row" gap={2} align="center" marginTop={4}>
-            {Array.from({ length: preset.rounds }).map((_, i) => (
-              <div key={i} style={{
-                width: 8, height: 8, borderRadius: 99,
-                background: i < currentRound - (phase === 'work' ? 1 : 0) ? phaseColors[phase] : 'var(--rs-color-background-neutral-faded)',
-                transition: 'background 0.3s',
-              }} />
-            ))}
-          </View>
-        </View>
+          {preset.name === 'Custom' && (
+            <div className="form-row-3" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
+              {[['work', 'Focus min'], ['shortBreak', 'Break'], ['longBreak', 'Long break'], ['rounds', 'Rounds']].map(([k, l]) => (
+                <div className="field" key={k}>
+                  <label className="field-label">{l}</label>
+                  <input className="input" type="number" min="1" max="180" value={custom[k]} onChange={(e) => setCustom((c) => ({ ...c, [k]: Math.max(1, Number(e.target.value)) }))} />
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
 
-        {/* Controls */}
-        <View direction="row" gap={3} align="center" style={{ justifyContent: 'center', paddingBottom: '1rem' }}>
-          <button onClick={resetTimer} style={{
-            width: 44, height: 44, borderRadius: 14, border: '1px solid var(--rs-color-border-neutral-faded)',
-            background: 'var(--rs-color-background-neutral-faded)', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}><RotateCcw size={18} /></button>
-
-          <button onClick={toggleTimer} style={{
-            width: 64, height: 64, borderRadius: 20,
-            background: phaseColors[phase], border: 'none', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'white', boxShadow: `0 4px 16px ${phaseColors[phase]}40`,
-            transition: 'all 0.2s',
-          }}>
-            {isRunning ? <Pause size={24} /> : <Play size={24} style={{ marginLeft: 2 }} />}
-          </button>
-
-          <button onClick={skipPhase} style={{
-            width: 44, height: 44, borderRadius: 14, border: '1px solid var(--rs-color-border-neutral-faded)',
-            background: 'var(--rs-color-background-neutral-faded)', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}><SkipForward size={18} /></button>
-        </View>
-
-        {/* Presets */}
-        <View padding={4} style={{ borderTop: '1px solid var(--rs-color-border-neutral-faded)' }}>
-          <Text variant="caption-1" weight="bold" color="neutral-faded" marginBottom={2}>Presets</Text>
-          <div style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
-            {FOCUS_PRESETS.map(p => (
-              <button key={p.name} onClick={() => changePreset(p)} style={{
-                padding: '6px 14px', borderRadius: 10, border: `2px solid ${preset.name === p.name ? phaseColors[phase] : 'var(--rs-color-border-neutral-faded)'}`,
-                background: preset.name === p.name ? `${phaseColors[phase]}10` : 'transparent',
-                cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, whiteSpace: 'nowrap',
-                color: preset.name === p.name ? phaseColors[phase] : 'var(--rs-color-foreground-neutral-default)',
-                transition: 'all 0.15s',
-              }}>
-                {p.name} ({p.work}m)
+      <div className="form-row" style={{ alignItems: 'end' }}>
+        {!timer && (
+          <div className="field">
+            <label className="field-label">Link a habit (optional)</label>
+            <select className="select" value={habitId} onChange={(e) => setHabitId(e.target.value)}>
+              <option value="">None</option>
+              {habits.filter((h) => !h.archived).map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+            </select>
+          </div>
+        )}
+        <div className="field" style={{ flex: 1 }}>
+          <label className="field-label">{timer ? 'Ambient sound' : 'Ambient sound'}</label>
+          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+            {FOCUS_SOUNDS.map((snd) => (
+              <button key={snd.name} className={`chip chip-btn ${(!timer ? 'Silence' : timer.sound) === snd.name ? 'on' : ''}`}
+                onClick={() => { if (timer) setTimerSound(snd.name); }}
+                style={!timer ? { opacity: 0.5, cursor: 'default' } : {}}>
+                {snd.name}
               </button>
             ))}
+            {timer && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-faint)' }}>
+                {timer.sound && timer.sound !== 'Silence' ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                <input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => setVolume(Number(e.target.value))} style={{ width: 70, accentColor: 'var(--accent)' }} />
+              </span>
+            )}
           </div>
-        </View>
-
-        {/* Stats */}
-        <View padding={4} direction="row" gap={4} style={{
-          borderTop: '1px solid var(--rs-color-border-neutral-faded)', justifyContent: 'center',
-        }}>
-          <View align="center">
-            <Text variant="body-1" weight="bold">{totalFocused}m</Text>
-            <Text variant="caption-2" color="neutral-faded">Focused</Text>
-          </View>
-          <View align="center">
-            <Text variant="body-1" weight="bold">{currentRound}/{preset.rounds}</Text>
-            <Text variant="caption-2" color="neutral-faded">Round</Text>
-          </View>
-          <View align="center">
-            <Text variant="body-1" weight="bold">{Math.round(totalFocused * 0.5)}</Text>
-            <Text variant="caption-2" color="neutral-faded">XP earned</Text>
-          </View>
-        </View>
+          {!timer && <span style={{ fontSize: '0.68rem', color: 'var(--text-faint)', fontWeight: 600 }}>Sounds available while a session runs</span>}
+        </div>
       </div>
-    </div>
+
+      {focusSessions.length > 0 && !timer && (
+        <div className="field">
+          <label className="field-label">Recent sessions</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, maxHeight: 120, overflowY: 'auto' }}>
+            {focusSessions.slice(0, 6).map((f) => {
+              const hb = habits.find((h) => h.id === f.habit_id);
+              return (
+                <div key={f.id} className="chip" style={{ justifyContent: 'flex-start', padding: '6px 10px' }}>
+                  <Timer size={10} color="var(--accent)" /> {f.duration_minutes} min{hb ? <> · <span style={{ color: hb.color }}>{hb.name}</span></> : null} · {new Date(f.started_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }

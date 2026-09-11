@@ -1,26 +1,26 @@
 [package]
 name = "habitt"
-version = "1.0.0"
+version = "2.0.0"
+description = "Habitt. — privacy-first habit tracker"
+authors = ["opngo"]
+license = "MIT"
 edition = "2021"
-description = "Habitt. - A beautiful desktop habit tracker"
-authors = ["Habitt Contributors"]
 
 [lib]
 name = "habitt_lib"
-crate-type = ["lib", "cdylib", "staticlib"]
+crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
-tauri-plugin-sql = { version = "2", features = ["sqlite"] }
-tauri-plugin-store = "2"
-tauri-plugin-dialog = "2"
-tauri-plugin-fs = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-chrono = { version = "0.4", features = ["serde"] }
-sha2 = "0.10"
-hex = "0.4"
-uuid = { version = "1", features = ["v4"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
+panic = "abort"

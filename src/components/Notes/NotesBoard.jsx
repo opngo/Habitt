@@ -1,182 +1,133 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, Button, Icon, Badge } from 'reshaped';
-import { Plus, Pin, PinOff, Trash2, Search, FileText, Tag, Edit3, Save, X } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { StickyNote, Plus, Search, Pin, PinOff, Trash2, Tag } from 'lucide-react';
 import { useStore } from '../../lib/store';
-import { createNote, updateNote, deleteNote } from '../../lib/db';
+import { formatShort, getToday } from '../../lib/utils';
 import DynIcon from '../Shared/DynIcon';
+import Modal from '../Shared/Modal';
+import ColorPicker from '../Shared/ColorPicker';
+import IconPicker from '../Shared/IconPicker';
 
-export default function NotesBoard({ refreshData }) {
-  const { notes, addToast } = useStore();
-  const [search, setSearch] = useState('');
-  const [filterTag, setFilterTag] = useState('all');
-  const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({ title: '', content: '', tags: [] });
-  const [showNew, setShowNew] = useState(false);
-  const [newNote, setNewNote] = useState({ title: '', content: '', tags: [], color: '#6366f1', icon: 'FileText' });
-  const [tagInput, setTagInput] = useState('');
-
+export default function NotesBoard() {
+  const { notes } = useStore();
+  const [q, setQ] = useState('');
+  const [tag, setTag] = useState('all');
+  const [editing, setEditing] = useState(null); // note obj or 'new'
   const allTags = useMemo(() => {
-    const tags = new Set();
-    notes.forEach(n => n.tags?.forEach(t => tags.add(t)));
-    return ['all', ...Array.from(tags).sort()];
+    const t = new Set();
+    notes.forEach((n) => n.tags?.forEach((x) => t.add(x)));
+    return ['all', ...[...t].sort()];
   }, [notes]);
-
-  const filtered = useMemo(() => {
-    return notes
-      .filter(n => filterTag === 'all' || n.tags?.includes(filterTag))
-      .filter(n => !search || n.title.toLowerCase().includes(search.toLowerCase()) || n.content.toLowerCase().includes(search.toLowerCase()));
-  }, [notes, filterTag, search]);
-
-  async function handleCreate() {
-    if (!newNote.title.trim()) return;
-    await createNote(newNote);
-    await refreshData();
-    setNewNote({ title: '', content: '', tags: [], color: '#6366f1', icon: 'FileText' });
-    setShowNew(false);
-    addToast({ type: 'success', message: 'Note created' });
-  }
-
-  async function handleSaveEdit(id) {
-    await updateNote(id, editForm);
-    await refreshData();
-    setEditingId(null);
-    addToast({ type: 'success', message: 'Note saved' });
-  }
-
-  async function handlePin(note) {
-    await updateNote(note.id, { pinned: note.pinned ? 0 : 1 });
-    await refreshData();
-  }
-
-  async function handleDelete(id) {
-    await deleteNote(id); await refreshData();
-    addToast({ type: 'info', message: 'Note deleted' });
-  }
-
-  function startEdit(note) {
-    setEditingId(note.id);
-    setEditForm({ title: note.title, content: note.content, tags: note.tags || [] });
-  }
+  const filtered = useMemo(() => notes
+    .filter((n) => tag === 'all' || n.tags?.includes(tag))
+    .filter((n) => !q || `${n.title} ${n.content} ${(n.tags || []).join(' ')}`.toLowerCase().includes(q.toLowerCase()))
+    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.updated_at || '').localeCompare(a.updated_at || '')),
+  [notes, q, tag]);
 
   return (
-    <div className="animate-fade-in">
-      <View direction="row" align="center" gap={3} marginBottom={5} style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
-        <View>
-          <Text variant="title-1" weight="bold">Notes</Text>
-          <Text variant="body-2" color="neutral-faded">Quick notes with tags and colors</Text>
-        </View>
-        <Button color="primary" onClick={() => setShowNew(!showNew)} startIcon={<Icon svg={<Plus size={16} />} />}>
-          New Note
-        </Button>
-      </View>
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
+        <div>
+          <h2 className="page-title"><StickyNote size={22} color="var(--amber)" /> Notes</h2>
+          <p className="page-sub">Quick thoughts, long pages — pinned to the top, searchable anytime.</p>
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          <div style={{ position: 'relative' }}>
+            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)' }} />
+            <input className="input" style={{ width: 190, padding: '8px 10px 8px 30px', fontSize: '0.82rem' }} placeholder="Search notes…" value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
+          <button className="btn btn-primary" onClick={() => setEditing('new')}><Plus size={15} /> New note</button>
+        </div>
+      </div>
 
-      {showNew && (
-        <View padding={4} marginBottom={4} className="animate-slide-up" style={{
-          background: 'var(--rs-color-background-neutral-default)', border: '1px solid var(--rs-color-border-primary-faded)', borderRadius: 16,
-        }}>
-          <View gap={3}>
-            <input value={newNote.title} onChange={e => setNewNote(n => ({ ...n, title: e.target.value }))}
-              placeholder="Note title..." autoFocus
-              style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: '1px solid var(--rs-color-border-neutral-faded)', background: 'var(--rs-color-background-neutral-faded)', fontSize: '0.9375rem' }} />
-            <textarea value={newNote.content} onChange={e => setNewNote(n => ({ ...n, content: e.target.value }))}
-              placeholder="Write your note..." rows={5}
-              style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: '1px solid var(--rs-color-border-neutral-faded)', background: 'var(--rs-color-background-neutral-faded)', fontSize: '0.875rem', resize: 'vertical' }} />
-            <View direction="row" gap={2} align="center" style={{ flexWrap: 'wrap' }}>
-              <input type="color" value={newNote.color} onChange={e => setNewNote(n => ({ ...n, color: e.target.value }))}
-                style={{ width: 32, height: 28, borderRadius: 8, border: 'none', cursor: 'pointer' }} />
-              <View direction="row" gap={1} align="center">
-                <input value={tagInput} onChange={e => setTagInput(e.target.value)} placeholder="Tag..."
-                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), tagInput.trim() && (setNewNote(n => ({ ...n, tags: [...n.tags, tagInput.trim()] })), setTagInput('')))}
-                  style={{ padding: '4px 8px', borderRadius: 8, border: '1px solid var(--rs-color-border-neutral-faded)', background: 'var(--rs-color-background-neutral-faded)', fontSize: '0.8125rem', width: 80 }} />
-              </View>
-              {newNote.tags.map(t => <Badge key={t} size="small" variant="faded" rounded color="primary" onClick={() => setNewNote(n => ({ ...n, tags: n.tags.filter(tg => tg !== t) }))}>{t} x</Badge>)}
-            </View>
-            <View direction="row" gap={2} style={{ justifyContent: 'flex-end' }}>
-              <Button variant="faded" color="neutral" onClick={() => setShowNew(false)}>Cancel</Button>
-              <Button color="primary" onClick={handleCreate}>Create Note</Button>
-            </View>
-          </View>
-        </View>
+      {allTags.length > 1 && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+          {allTags.map((t) => (
+            <button key={t} className={`chip chip-btn ${tag === t ? 'on' : ''}`} onClick={() => setTag(t)}>{t === 'all' ? 'All tags' : `# ${t}`}</button>
+          ))}
+        </div>
       )}
 
-      {/* Filters */}
-      <View direction="row" gap={2} marginBottom={4} align="center" style={{ flexWrap: 'wrap' }}>
-        <View direction="row" gap={1} style={{ flexWrap: 'wrap' }}>
-          {allTags.map(tag => (
-            <button key={tag} onClick={() => setFilterTag(tag)} style={{
-              padding: '4px 12px', borderRadius: 10,
-              border: `1px solid ${filterTag === tag ? '#6366f1' : 'var(--rs-color-border-neutral-faded)'}`,
-              background: filterTag === tag ? 'rgba(99,102,241,0.08)' : 'transparent',
-              cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, textTransform: 'capitalize',
-              color: filterTag === tag ? '#6366f1' : 'var(--rs-color-foreground-neutral-faded)',
-            }}>{tag}</button>
-          ))}
-        </View>
-        <div style={{ position: 'relative', marginLeft: 'auto' }}>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search notes..."
-            style={{ padding: '6px 12px 6px 30px', borderRadius: 10, border: '1px solid var(--rs-color-border-neutral-faded)', background: 'var(--rs-color-background-neutral-default)', fontSize: '0.8125rem', width: 180 }} />
-          <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--rs-color-foreground-neutral-faded)' }} />
-        </div>
-      </View>
-
-      {/* Notes grid */}
       {filtered.length === 0 ? (
-        <View padding={8} align="center" style={{ background: 'var(--rs-color-background-neutral-faded)', borderRadius: 20, border: '2px dashed var(--rs-color-border-neutral-faded)' }}>
-          <FileText size={48} color="#6366f1" style={{ marginBottom: 12 }} />
-          <Text variant="title-3" weight="bold" marginBottom={2}>No notes yet</Text>
-        </View>
+        <div className="empty" style={{ padding: '44px 22px' }}>
+          <div className="empty-icon" style={{ background: 'rgba(245,158,11,0.13)' }}><StickyNote size={28} color="var(--amber)" /></div>
+          <h3 style={{ margin: 0 }}>{q ? 'No notes match your search' : 'No notes yet'}</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.86rem' }}>Capture something — ideas, lecture summaries, recipes…</p>
+          <button className="btn btn-primary" onClick={() => setEditing('new')}><Plus size={14} /> Write your first note</button>
+        </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
-          {filtered.map((note, i) => (
-            <div key={note.id} className={`animate-slide-up stagger-${(i % 6) + 1}`} style={{
-              background: 'var(--rs-color-background-neutral-default)',
-              border: '1px solid var(--rs-color-border-neutral-faded)', borderRadius: 16,
-              borderTop: `4px solid ${note.color}`, padding: '1.25rem',
-              transition: 'all 0.2s', cursor: 'default',
-            }}>
-              {editingId === note.id ? (
-                <View gap={2}>
-                  <input value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
-                    style={{ width: '100%', padding: '6px 10px', borderRadius: 8, border: '1px solid var(--rs-color-border-neutral-faded)', fontSize: '0.9375rem', fontWeight: 700 }} />
-                  <textarea value={editForm.content} onChange={e => setEditForm(f => ({ ...f, content: e.target.value }))}
-                    rows={4} style={{ width: '100%', padding: '6px 10px', borderRadius: 8, border: '1px solid var(--rs-color-border-neutral-faded)', fontSize: '0.8125rem', resize: 'vertical' }} />
-                  <View direction="row" gap={1}>
-                    <Button size="small" color="primary" onClick={() => handleSaveEdit(note.id)} startIcon={<Icon svg={<Save size={12} />} />}>Save</Button>
-                    <Button size="small" variant="faded" color="neutral" onClick={() => setEditingId(null)} startIcon={<Icon svg={<X size={12} />} />}>Cancel</Button>
-                  </View>
-                </View>
-              ) : (
-                <>
-                  <View direction="row" align="start" gap={2} marginBottom={2}>
-                    <DynIcon name={note.icon || 'FileText'} size={18} color={note.color} />
-                    <Text variant="body-1" weight="bold" style={{ flex: 1 }}>{note.title}</Text>
-                    <View direction="row" gap={1}>
-                      <button onClick={() => handlePin(note)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: note.pinned ? '#f59e0b' : 'var(--rs-color-foreground-neutral-faded)' }}>
-                        {note.pinned ? <Pin size={14} /> : <PinOff size={14} />}
-                      </button>
-                      <button onClick={() => startEdit(note)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--rs-color-foreground-neutral-faded)' }}>
-                        <Edit3 size={14} />
-                      </button>
-                      <button onClick={() => handleDelete(note.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--rs-color-foreground-neutral-faded)' }}>
-                        <Trash2 size={14} />
-                      </button>
-                    </View>
-                  </View>
-                  <Text variant="body-3" color="neutral-faded" style={{
-                    display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                    whiteSpace: 'pre-wrap', lineHeight: 1.5,
-                  }}>{note.content || 'Empty note'}</Text>
-                  {note.tags?.length > 0 && (
-                    <View direction="row" gap={1} marginTop={2} style={{ flexWrap: 'wrap' }}>
-                      {note.tags.map(t => <Badge key={t} size="small" variant="faded" rounded color="neutral"><Tag size={8} /> {t}</Badge>)}
-                    </View>
-                  )}
-                </>
-              )}
-            </div>
+        <div className="grid stagger" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))' }}>
+          {filtered.map((n, i) => (
+            <article key={n.id} className="card card-hover" style={{ '--i': i, borderTop: `3px solid ${n.color}`, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 8 }} onClick={() => setEditing(n)}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                <DynIcon name={n.icon || 'FileText'} size={17} color={n.color} />
+                <b style={{ flex: 1, fontSize: '0.92rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.title}</b>
+                {n.pinned && <Pin size={13} color={n.color} fill={n.color} />}
+              </div>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '7.5em', overflow: 'hidden' }}>
+                {n.content ? (n.content.length > 220 ? n.content.slice(0, 220) + '…' : n.content) : <span style={{ fontStyle: 'italic', color: 'var(--text-faint)' }}>Empty note</span>}
+              </p>
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 'auto' }}>
+                {(n.tags || []).slice(0, 3).map((t) => <span key={t} className="chip"><Tag size={8} /> {t}</span>)}
+                <span className="chip" style={{ marginLeft: 'auto', opacity: 0.7 }}>{n.updated_at ? formatShort(n.updated_at.slice(0, 10)) : getToday()}</span>
+              </div>
+            </article>
           ))}
         </div>
       )}
+
+      {editing && <NoteEditor note={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
     </div>
+  );
+}
+
+function NoteEditor({ note, onClose }) {
+  const { addNote, updateNote, deleteNote, togglePinNote, addToast } = useStore();
+  const [f, setF] = useState(note ? { ...note } : { title: '', content: '', tags: [], color: '#f59e0b', icon: 'StickyNote', pinned: false });
+  const [tagInput, setTagInput] = useState('');
+  const [tab, setTab] = useState('write');
+
+  const save = () => {
+    if (note) updateNote(note.id, { title: f.title.trim() || 'Untitled', content: f.content, tags: f.tags, color: f.color, icon: f.icon, pinned: f.pinned });
+    else addNote({ ...f, title: f.title.trim() || 'Untitled' });
+    addToast({ type: 'success', message: 'Note saved' });
+    onClose();
+  };
+
+  return (
+    <Modal title={note ? 'Edit note' : 'New note'} icon={<DynIcon name={f.icon} size={18} color={f.color} />} onClose={onClose} wide
+      footer={<>
+        {note && (
+          <>
+            <button className="btn btn-ghost" style={{ marginRight: 'auto', color: f.color }} onClick={() => { togglePinNote(note.id); setF((x) => ({ ...x, pinned: !x.pinned })); }}>
+              {f.pinned ? <><PinOff size={14} /> Unpin</> : <><Pin size={14} /> Pin to top</>}
+            </button>
+            <button className="btn btn-danger" onClick={() => { deleteNote(note.id); onClose(); }}><Trash2 size={14} /> Delete</button>
+          </>
+        )}
+        <button className="btn" onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" onClick={save}>Save</button>
+      </>}>
+      <input className="input" autoFocus placeholder="Note title…" style={{ fontWeight: 750 }} value={f.title} onChange={(e) => setF((x) => ({ ...x, title: e.target.value }))} />
+      <div style={{ display: 'flex', gap: 7 }}>
+        {['write', 'style'].map((t) => <button key={t} className={`chip chip-btn ${tab === t ? 'on' : ''}`} onClick={() => setTab(t)}>{t === 'write' ? '✍️ Write' : '🎨 Look'}</button>)}
+      </div>
+      {tab === 'write' ? (
+        <textarea className="textarea" style={{ minHeight: 240, fontFamily: 'var(--font)' }} placeholder="Start writing…" value={f.content} onChange={(e) => setF((x) => ({ ...x, content: e.target.value }))} />
+      ) : (
+        <>
+          <div className="field"><span className="field-label">Color</span><ColorPicker selected={f.color} onSelect={(c) => setF((x) => ({ ...x, color: c }))} /></div>
+          <div className="field"><span className="field-label">Icon</span><IconPicker selected={f.icon} onSelect={(icon) => setF((x) => ({ ...x, icon }))} color={f.color} /></div>
+        </>
+      )}
+      <div className="field">
+        <span className="field-label">Tags</span>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          {f.tags.map((t) => <button key={t} className="chip on" style={{ cursor: 'pointer' }} onClick={() => setF((x) => ({ ...x, tags: x.tags.filter((y) => y !== t) }))}>{t} ✕</button>)}
+          <input className="input" style={{ width: 140, padding: '6px 10px', fontSize: '0.8rem' }} placeholder="tag + Enter" value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && tagInput.trim()) { setF((x) => ({ ...x, tags: [...new Set([...x.tags, tagInput.trim()])] })); setTagInput(''); e.stopPropagation(); } }} />
+        </div>
+      </div>
+    </Modal>
   );
 }

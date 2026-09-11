@@ -1,7 +1,8 @@
 {
+  "$schema": "https://schema.tauri.app/config/2",
   "productName": "Habitt",
-  "version": "1.0.0",
-  "identifier": "com.habitt.app",
+  "version": "2.0.0",
+  "identifier": "app.habitt.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -11,15 +12,15 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Habitt.",
-        "width": 1100,
-        "height": 750,
-        "minWidth": 800,
-        "minHeight": 600,
-        "resizable": true,
-        "fullscreen": false,
+        "width": 1440,
+        "height": 900,
+        "minWidth": 980,
+        "minHeight": 640,
         "center": true,
-        "decorations": false
+        "resizable": true,
+        "decorations": true
       }
     ],
     "security": {
@@ -28,7 +29,12 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "deb", "appimage"],
+    "targets": "all",
+    "category": "Productivity",
+    "shortDescription": "Privacy-first habit tracker",
+    "longDescription": "Habitt. is a beautiful, local-first habit tracker with heatmaps, streaks, journaling, tasks, homework, notes, a focus timer, XP and achievements. No accounts, no cloud, no tracking.",
+    "copyright": "MIT License",
+    "license": "MIT",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -36,22 +42,19 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "windows": {
-      "nsis": {
-        "installMode": "currentUser",
-        "displayLanguageSelector": true,
-        "languages": ["English"]
-      }
-    },
     "linux": {
       "deb": {
-        "depends": []
+        "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0"]
       }
-    }
-  },
-  "plugins": {
-    "sql": {
-      "preload": ["sqlite:habitt.db"]
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "installMode": "both",
+        "languages": ["English"]
+      }
     }
   }
 }

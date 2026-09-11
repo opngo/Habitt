@@ -1,223 +1,262 @@
 import React, { useMemo } from 'react';
-import { View, Text, Badge, Divider } from 'reshaped';
-import { Trophy, Flame, Target, TrendingUp, Calendar, Award, Star, Zap, Medal, BarChart3, PieChart, SmilePlus } from 'lucide-react';
+import { BarChart3, Flame, Trophy, Crown, Medal, Award, Percent, CalendarDays, CheckCircle2, Layers } from 'lucide-react';
 import { useStore } from '../../lib/store';
+import {
+  getToday, toStr, getLast30Days, getLast7Days, getCompletionRate, getCurrentStreak, getLongestStreak,
+  getBestDay, formatShort, differenceInCalendarDays, subDays, getDay,
+} from '../../lib/utils';
+import { ACHIEVEMENTS, CATEGORIES, DAY_NAMES_SHORT } from '../../lib/constants';
 import DynIcon from '../Shared/DynIcon';
-import { getCurrentStreak, getLongestStreak, getCompletionRate, getLast30Days, getLast7Days, getDayOfWeekStats, toStr } from '../../lib/utils';
-import { ACHIEVEMENTS, MOODS } from '../../lib/constants';
 import YearHeatmap from '../Heatmap/YearHeatmap';
 
 export default function StatsDashboard() {
-  const { habits, completions, journalEntries, achievements, xp, level } = useStore();
-  const activeHabits = habits.filter(h => !h.archived);
+  const { habits, completions, journalEntries, vacationPeriods, xp, achievements } = useStore();
+  const active = habits.filter((h) => !h.archived);
+  const today = getToday();
 
-  const overallStats = useMemo(() => {
-    const last30 = getLast30Days();
-    const last7 = getLast7Days();
-    const totalCompletions = completions.length;
-    const activeDays = new Set(completions.map(c => c.date)).size;
-    const rate30 = completions.length > 0 ? getCompletionRate(completions, last30) : 0;
-    const rate7 = completions.length > 0 ? getCompletionRate(completions, last7) : 0;
+  const rate30 = getCompletionRate(habits, completions, vacationPeriods, getLast30Days());
+  const rate7 = getCompletionRate(habits, completions, vacationPeriods, getLast7Days());
+  const best = getBestDay(completions);
 
-    // Streaks per habit
-    const streaks = activeHabits.map(h => ({
-      ...h,
-      current: getCurrentStreak(completions.filter(c => c.habit_id === h.id)),
-      longest: getLongestStreak(completions.filter(c => c.habit_id === h.id)),
-    })).sort((a, b) => b.current - a.current);
+  // streak leaderboard
+  const board = useMemo(() => active
+    .map((h) => ({ h, cur: getCurrentStreak(h, completions.filter((c) => c.habit_id === h.id), vacationPeriods), best: getLongestStreak(h, completions.filter((c) => c.habit_id === h.id), vacationPeriods) }))
+    .sort((a, b) => b.cur - a.cur || b.best - a.best),
+  [active, completions, vacationPeriods]);
 
-    const bestStreak = streaks[0]?.current || 0;
-    const avgRate = activeHabits.length > 0
-      ? Math.round(activeHabits.reduce((sum, h) => sum + getCompletionRate(completions.filter(c => c.habit_id === h.id), last30), 0) / activeHabits.length)
-      : 0;
+  // monthly trend for current year
+  const year = new Date().getFullYear();
+  const months = useMemo(() => {
+    const out = [];
+    for (let m = 0; m < 12; m++) {
+      const count = completions.filter((c) => { const d = new Date(c.date + 'T12:00:00'); return d.getFullYear() === year && d.getMonth() === m; }).length;
+      out.push({ m, count });
+    }
+    return out;
+  }, [completions, year]);
+  const maxMonth = Math.max(1, ...months.map((x) => x.count));
 
-    // Day of week overall
-    const dayStats = getDayOfWeekStats(completions);
+  // day-of-week overall
+  const dow = useMemo(() => {
+    const counts = [0, 0, 0, 0, 0, 0, 0];
+    completions.forEach((c) => counts[getDay(new Date(c.date + 'T12:00:00'))]++);
+    const max = Math.max(1, ...counts);
+    return counts.map((count, i) => ({ i, count, pct: (count / max) * 100 }));
+  }, [completions]);
 
-    // Category breakdown
-    const catBreakdown = {};
-    activeHabits.forEach(h => {
-      if (!catBreakdown[h.category]) catBreakdown[h.category] = { count: 0, completions: 0 };
-      catBreakdown[h.category].count++;
-      catBreakdown[h.category].completions += completions.filter(c => c.habit_id === h.id).length;
+  // category breakdown
+  const byCat = useMemo(() => {
+    const map = {};
+    habits.forEach((h) => { map[h.category] = (map[h.category] || 0) + completions.filter((c) => c.habit_id === h.id).length; });
+    const total = Object.values(map).reduce((a, b) => a + b, 0) || 1;
+    return Object.entries(map).map(([name, n]) => ({ name, n, pct: Math.round((n / total) * 100) })).sort((a, b) => b.n - a.n);
+  }, [habits, completions]);
+
+  // mood correlation: avg completion-rate bucketed by mood
+  const moodCorr = useMemo(() => {
+    if (!journalEntries.length || !habits.length) return null;
+    const buckets = { 1: [], 2: [], 3: [], 4: [], 5: [] };
+    journalEntries.forEach((j) => {
+      const exp = habits.filter((h) => !h.archived);
+      const done = exp.filter((h) => completions.some((c) => c.habit_id === h.id && c.date === j.date)).length;
+      const m = buckets[j.mood || 3];
+      if (m && exp.length) m.push(Math.round((done / exp.length) * 100));
     });
+    const stats = [1, 2, 3, 4, 5].map((mood) => {
+      const arr = buckets[mood];
+      return { mood, n: arr.length, avg: arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null };
+    }).filter((x) => x.n > 0);
+    return stats.length ? stats : null;
+  }, [journalEntries, habits, completions]);
 
-    // Mood trend
-    const moodTrend = journalEntries.slice(0, 14).reverse().map(e => ({
-      date: e.date, mood: e.mood, energy: e.energy || 3,
-    }));
-
-    return {
-      totalCompletions, activeDays, rate30, rate7, bestStreak, avgRate,
-      streaks, dayStats, catBreakdown, moodTrend,
-    };
-  }, [habits, completions, journalEntries]);
+  const unlocked = ACHIEVEMENTS.filter((a) => achievements.includes(a.id));
+  const locked = ACHIEVEMENTS.filter((a) => !achievements.includes(a.id));
+  const achPct = Math.round((unlocked.length / ACHIEVEMENTS.length) * 100);
 
   return (
-    <div className="animate-fade-in">
-      <View marginBottom={6}>
-        <Text variant="title-1" weight="bold">Statistics</Text>
-        <Text variant="body-2" color="neutral-faded">Your habit tracking insights and progress</Text>
-      </View>
+    <div>
+      <div className="page-head">
+        <h2 className="page-title"><BarChart3 size={22} color="var(--blue)" /> Statistics</h2>
+        <p className="page-sub">The numbers behind the momentum.</p>
+      </div>
 
-      {/* Top Stats */}
-      <div className="grid-4 mb-xl">
+      {/* headline */}
+      <div className="grid grid-stats stagger" style={{ marginBottom: 18 }}>
         {[
-          { icon: <Zap size={22} color="#8b5cf6" />, value: xp, label: 'Total XP', bg: 'rgba(139,92,246,0.08)' },
-          { icon: <Flame size={22} color="#f97316" />, value: overallStats.bestStreak, label: 'Best Active Streak', bg: 'rgba(249,115,22,0.08)' },
-          { icon: <Target size={22} color="#3b82f6" />, value: `${overallStats.avgRate}%`, label: 'Avg 30-Day Rate', bg: 'rgba(59,130,246,0.08)' },
-          { icon: <Calendar size={22} color="#22c55e" />, value: overallStats.activeDays, label: 'Active Days', bg: 'rgba(34,197,94,0.08)' },
+          { i: Percent, l: 'Completion · 30d', v: `${rate30}%`, c: '#22c55e', sub: `7d: ${rate7}%` },
+          { i: CheckCircle2, l: 'Total completions', v: completions.length, c: '#3b82f6', sub: `${active.length} active habits` },
+          { i: Flame, l: 'Longest streak', v: board.length ? Math.max(...board.map((b) => Math.max(b.cur, b.best))) : 0, c: '#f97316', sub: 'days in a row' },
+          { i: CalendarDays, l: 'Best day ever', v: best.date ? best.count : 0, c: '#8b5cf6', sub: best.date ? formatShort(best.date) : '—' },
         ].map((s, i) => (
-          <div key={i} className={`stat-card animate-slide-up stagger-${i + 1}`}>
-            <div style={{
-              width: 44, height: 44, borderRadius: 12, background: s.bg,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12,
-            }}>{s.icon}</div>
-            <Text variant="display-2" weight="bold">{s.value}</Text>
-            <Text variant="caption-1" color="neutral-faded">{s.label}</Text>
+          <div key={s.l} className="card stat-card" style={{ '--i': i }}>
+            <div className="stat-icon" style={{ background: `color-mix(in srgb, ${s.c} 13%, transparent)` }}><s.i size={21} color={s.c} /></div>
+            <div>
+              <div className="stat-value">{s.v}</div>
+              <div className="stat-label">{s.l}</div>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-faint)', marginTop: 2, fontWeight: 600 }}>{s.sub}</div>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Overall Heatmap */}
-      <View marginBottom={6}>
-        <Text variant="title-3" weight="bold" marginBottom={3}>Overall Activity</Text>
-        <YearHeatmap completions={completions} habits={activeHabits} />
-      </View>
+      <div className="card card-pad" style={{ marginBottom: 18 }}>
+        <h3 style={{ margin: '0 0 10px', fontSize: '0.95rem', fontWeight: 800 }}>Consistency heatmap</h3>
+        <YearHeatmap />
+      </div>
 
-      {/* Streak Leaderboard */}
-      <View marginBottom={6}>
-        <Text variant="title-3" weight="bold" marginBottom={3}> Streak Leaderboard</Text>
-        <View gap={2}>
-          {overallStats.streaks.slice(0, 8).map((h, i) => (
-            <View key={h.id} direction="row" align="center" gap={3} padding={3} style={{
-              background: 'var(--rs-color-background-neutral-default)',
-              border: '1px solid var(--rs-color-border-neutral-faded)',
-              borderRadius: 10, transition: 'all 0.2s',
-            }}>
-              <div style={{
-                width: 28, height: 28, borderRadius: '50%',
-                background: i === 0 ? '#fbbf24' : i === 1 ? '#94a3b8' : i === 2 ? '#d97706' : 'var(--rs-color-background-neutral-faded)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '0.75rem', fontWeight: 800, color: i < 3 ? 'white' : 'var(--rs-color-foreground-neutral-faded)',
-              }}>{i + 1}</div>
-              <span style={{ fontSize: '1.25rem' }}>{h.icon}</span>
-              <View style={{ flex: 1 }}>
-                <Text variant="body-3" weight="bold">{h.name}</Text>
-                <Text variant="caption-2" color="neutral-faded">{h.category}</Text>
-              </View>
-              <View align="end">
-                <View direction="row" gap={1} align="center">
-                  <Flame size={14} color="#f97316" />
-                  <Text variant="body-2" weight="bold">{h.current}</Text>
-                </View>
-                <Text variant="caption-2" color="neutral-faded">Best: {h.longest}</Text>
-              </View>
-              {/* Progress bar */}
-              <div style={{ width: 60, height: 6, borderRadius: 3, background: 'var(--rs-color-background-neutral-faded)', overflow: 'hidden' }}>
-                <div style={{
-                  height: '100%', borderRadius: 3, background: h.color,
-                  width: `${Math.min((h.current / 30) * 100, 100)}%`,
-                  transition: 'width 0.8s ease',
-                }} />
+      <div className="grid grid-2" style={{ marginBottom: 18 }}>
+        {/* Monthly trend */}
+        <div className="card card-pad">
+          <h3 style={{ margin: '0 0 14px', fontSize: '0.95rem', fontWeight: 800 }}>Monthly trend · {year}</h3>
+          <div className="bars">
+            {months.map((m) => (
+              <div key={m.m} className="bar-col" title={`${m.count} completions`}>
+                <div className="bar" style={{ height: `${(m.count / maxMonth) * 100}%`, background: m.count ? 'linear-gradient(180deg, #22c55e, #15803d)' : 'var(--surface-3)' }} />
+                <div className="bar-label">{'JFMAMJJASOND'[m.m]}</div>
               </div>
-            </View>
-          ))}
-          {overallStats.streaks.length === 0 && (
-            <Text variant="body-3" color="neutral-faded" style={{ fontStyle: 'italic' }}>Create habits and start checking in to see your leaderboard!</Text>
-          )}
-        </View>
-      </View>
+            ))}
+          </div>
+        </div>
 
-      {/* Day of Week Pattern */}
-      <View direction="row" gap={6} marginBottom={6}>
-        <View style={{ flex: 1 }}>
-          <Text variant="title-3" weight="bold" marginBottom={3}>Day of Week Pattern</Text>
-          <View padding={4} style={{
-            background: 'var(--rs-color-background-neutral-default)',
-            border: '1px solid var(--rs-color-border-neutral-faded)',
-            borderRadius: 12,
-          }}>
-            <div className="bar-chart">
-              {overallStats.dayStats.map((d, i) => {
-                const max = Math.max(...overallStats.dayStats.map(x => x.count), 1);
+        {/* Day of week */}
+        <div className="card card-pad">
+          <h3 style={{ margin: '0 0 14px', fontSize: '0.95rem', fontWeight: 800 }}>When you show up</h3>
+          <div className="bars" style={{ height: 130 }}>
+            {dow.map((d) => (
+              <div key={d.i} className="bar-col" title={`${d.count} completions on ${DAY_NAMES_SHORT[d.i]}`}>
+                <div className="bar" style={{ height: `${d.pct}%`, background: 'linear-gradient(180deg, #3b82f6, #8b5cf6)', maxWidth: 34, margin: '0 auto' }} />
+                <div className="bar-label">{DAY_NAMES_SHORT[d.i].slice(0, 1)}</div>
+              </div>
+            ))}
+          </div>
+          <p style={{ margin: '10px 0 0', fontSize: '0.72rem', color: 'var(--text-faint)', fontWeight: 600 }}>
+            Strongest day: {dow.length ? DAY_NAMES_SHORT[dow.reduce((a, b) => (b.count > a.count ? b : a)).i] : '—'}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-2" style={{ marginBottom: 18 }}>
+        {/* Categories */}
+        <div className="card card-pad">
+          <h3 style={{ margin: '0 0 12px', fontSize: '0.95rem', fontWeight: 800, display: 'flex', gap: 7, alignItems: 'center' }}><Layers size={15} color="var(--cyan)" /> Category breakdown</h3>
+          {byCat.length === 0 ? <p style={{ color: 'var(--text-faint)', fontSize: '0.84rem', margin: 0 }}>Create habits to see the split.</p> : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+              {byCat.map((c) => {
+                const meta = CATEGORIES.find((x) => x.name === c.name);
                 return (
-                  <div key={i} style={{ flex: 1, textAlign: 'center' }}>
-                    <div className="bar" style={{
-                      height: `${Math.max((d.count / max) * 100, 4)}%`,
-                      background: 'linear-gradient(to top, #3b82f6, #22c55e)',
-                    }} />
-                    <Text variant="caption-2" color="neutral-faded">{d.name}</Text>
-                    <Text variant="caption-2" weight="bold">{d.count}</Text>
+                  <div key={c.name}>
+                    <div style={{ display: 'flex', fontSize: '0.78rem', fontWeight: 700, marginBottom: 4 }}>
+                      <DynIcon name={meta?.icon || 'Zap'} size={12} color={meta?.color} />
+                      <span style={{ marginLeft: 6, flex: 1 }}>{c.name}</span>
+                      <span style={{ color: 'var(--text-faint)' }}>{c.n} · {c.pct}%</span>
+                    </div>
+                    <div className="progress-track" style={{ height: 7 }}>
+                      <div className="progress-fill" style={{ width: `${c.pct}%`, background: `linear-gradient(90deg, ${meta?.color || '#22c55e'}, color-mix(in srgb, ${meta?.color || '#22c55e'} 55%, #fff))` }} />
+                    </div>
                   </div>
                 );
               })}
             </div>
-          </View>
-        </View>
+          )}
+        </div>
 
-        {/* Category Breakdown */}
-        <View style={{ flex: 1 }}>
-          <Text variant="title-3" weight="bold" marginBottom={3}>Category Breakdown</Text>
-          <View gap={2}>
-            {Object.entries(overallStats.catBreakdown).map(([cat, data]) => (
-              <View key={cat} direction="row" align="center" gap={3} padding={2} style={{
-                background: 'var(--rs-color-background-neutral-faded)', borderRadius: 8,
-              }}>
-                <Text variant="body-3" style={{ flex: 1 }}>{cat}</Text>
-                <Badge size="small" variant="faded" rounded>{data.count} habits</Badge>
-                <Text variant="caption-1" weight="bold">{data.completions} </Text>
-              </View>
-            ))}
-            {Object.keys(overallStats.catBreakdown).length === 0 && (
-              <Text variant="body-3" color="neutral-faded" style={{ fontStyle: 'italic' }}>No habits yet</Text>
-            )}
-          </View>
-        </View>
-      </View>
+        {/* Mood correlation */}
+        <div className="card card-pad">
+          <h3 style={{ margin: '0 0 12px', fontSize: '0.95rem', fontWeight: 800, display: 'flex', gap: 7, alignItems: 'center' }}><span style={{ fontSize: 15 }}>😊</span> Mood ↔ habit correlation</h3>
+          {!moodCorr ? (
+            <p style={{ color: 'var(--text-faint)', fontSize: '0.84rem', margin: 0, lineHeight: 1.5 }}>
+              Log moods in the <b>Journal</b> and Habitt will show whether you complete more habits on good days, bad days, or both.
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {moodCorr.map((s) => (
+                <div key={s.mood} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.8rem' }}>
+                  <span style={{ width: 26, textAlign: 'center', fontSize: '1rem' }}>{['😖', '🙁', '😐', '🙂', '😄'][s.mood - 1]}</span>
+                  <div className="progress-track" style={{ flex: 1, height: 9 }}>
+                    <div className="progress-fill" style={{ width: `${s.avg ?? 0}%`, background: `linear-gradient(90deg, ${['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#22c55e'][s.mood - 1]})` }} />
+                  </div>
+                  <span style={{ width: 76, textAlign: 'right', color: 'var(--text-muted)', fontWeight: 700 }}>{s.avg}% · {s.n} day{s.n === 1 ? '' : 's'}</span>
+                </div>
+              ))}
+              {moodCorr.length >= 2 && (() => {
+                const hi = [...moodCorr].sort((a, b) => (b.avg ?? 0) - (a.avg ?? 0))[0];
+                const lo = [...moodCorr].sort((a, b) => (a.avg ?? 0) - (b.avg ?? 0))[0];
+                return <p style={{ margin: '6px 0 0', fontSize: '0.76rem', color: 'var(--text-muted)' }}>On <b>{['terrible','bad','okay','good','great'][hi.mood-1]}</b> days you complete <b>{hi.avg - lo.avg >= 0 ? `+${hi.avg - lo.avg}` : 'the same'}</b> pts more than {['terrible','bad','okay','good','great'][lo.mood-1]} days. Keep journaling for a sharper picture.</p>;
+              })()}
+            </div>
+          )}
+        </div>
+      </div>
 
-      {/* Mood Trend */}
-      {overallStats.moodTrend.length > 0 && (
-        <View marginBottom={6}>
-          <Text variant="title-3" weight="bold" marginBottom={3}>Mood Trend (Last 14 Entries)</Text>
-          <View padding={4} style={{
-            background: 'var(--rs-color-background-neutral-default)',
-            border: '1px solid var(--rs-color-border-neutral-faded)',
-            borderRadius: 12,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 80 }}>
-              {overallStats.moodTrend.map((m, i) => (
-                <div key={i} style={{ flex: 1, textAlign: 'center' }}>
-                  <div style={{
-                    height: `${m.mood * 20}%`, minHeight: 8,
-                    background: MOODS[m.mood - 1]?.color || '#94a3b8',
-                    borderRadius: '4px 4px 0 0', transition: 'height 0.5s',
-                  }} />
-                  <DynIcon name={MOODS[m.mood - 1]?.icon || 'Minus'} size={14} color={MOODS[m.mood - 1]?.color} />
+      <div className="grid grid-2" style={{ marginBottom: 18 }}>
+        {/* Leaderboard */}
+        <div className="card card-pad">
+          <h3 style={{ margin: '0 0 12px', fontSize: '0.95rem', fontWeight: 800, display: 'flex', gap: 7, alignItems: 'center' }}><Trophy size={15} color="var(--amber)" /> Streak leaderboard</h3>
+          {board.length === 0 ? <p style={{ color: 'var(--text-faint)', fontSize: '0.84rem', margin: 0 }}>Add habits to compete with yourself.</p> : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              {board.map((b, i) => (
+                <div key={b.h.id} className="lb-row">
+                  <div className="lb-rank" style={i === 0 ? { background: 'linear-gradient(135deg,#fbbf24,#d97706)', color: '#fff' } : i === 1 ? { background: 'var(--surface-3)', color: 'var(--text-muted)' } : i === 2 ? { background: 'color-mix(in srgb,#b45309 18%,transparent)', color: '#b45309' } : { background: 'var(--surface-3)', color: 'var(--text-faint)' }}>
+                    {i === 0 ? <Crown size={13} /> : i + 1}
+                  </div>
+                  <DynIcon name={b.h.icon} size={16} color={b.h.color} />
+                  <span style={{ flex: 1, fontWeight: 700, fontSize: '0.84rem' }}>{b.h.name}</span>
+                  <span className="chip" style={{ color: b.cur > 0 ? '#f97316' : undefined }}><Flame size={10} /> {b.cur}d now</span>
+                  <span className="chip">best {b.best}d</span>
                 </div>
               ))}
             </div>
-          </View>
-        </View>
-      )}
+          )}
+        </div>
+
+        {/* XP */}
+        <div className="card card-pad" style={{ background: 'linear-gradient(150deg, color-mix(in srgb, var(--violet) 10%, var(--surface)), var(--surface))' }}>
+          <h3 style={{ margin: '0 0 12px', fontSize: '0.95rem', fontWeight: 800, display: 'flex', gap: 7, alignItems: 'center' }}><Award size={15} color="var(--violet)" /> Level & XP</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ width: 74, height: 74, borderRadius: '50%', background: 'conic-gradient(#8b5cf6 ' + ((xp % 100) * 3.6) + 'deg, var(--surface-3) 0deg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 58, height: 58, borderRadius: '50%', background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
+                <span style={{ fontWeight: 900, fontSize: '1.15rem' }}>{Math.floor(xp / 100) + 1}</span>
+                <span style={{ fontSize: '0.55rem', fontWeight: 800, color: 'var(--text-faint)' }}>LEVEL</span>
+              </div>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 800, fontSize: '1.05rem' }}>{xp} XP total</div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '3px 0 8px' }}>{100 - (xp % 100)} XP to level {Math.floor(xp / 100) + 2}</div>
+              <div className="progress-track"><div className="progress-fill" style={{ width: `${xp % 100}%`, background: 'linear-gradient(90deg,#8b5cf6,#3b82f6)' }} /></div>
+              <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+                <span className="chip"><Medal size={10} /> {unlocked.length} unlocked</span>
+                <span className="chip">{achPct}% complete</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Achievements */}
-      <View marginBottom={6}>
-        <Text variant="title-3" weight="bold" marginBottom={3}> Achievements ({achievements.length}/{ACHIEVEMENTS.length})</Text>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.75rem' }}>
-          {ACHIEVEMENTS.map(a => {
-            const unlocked = achievements.includes(a.id);
+      <div className="card card-pad">
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
+          <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800 }}>Achievements</h3>
+          <span className="chip" style={{ marginLeft: 10 }}>{unlocked.length}/{ACHIEVEMENTS.length} · {achPct}%</span>
+          <div className="progress-track" style={{ width: 180, marginLeft: 'auto' }}>
+            <div className="progress-fill" style={{ width: `${achPct}%`, background: 'linear-gradient(90deg,#f59e0b,#ec4899)' }} />
+          </div>
+        </div>
+        <div className="grid stagger" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
+          {[...unlocked, ...locked].map((a, i) => {
+            const has = achievements.includes(a.id);
             return (
-              <div key={a.id} className={`badge-achievement ${unlocked ? 'unlocked' : 'locked'}`}>
-                <span className="badge-icon">{a.icon}</span>
-                <span className="badge-name">{a.name}</span>
-                <span className="badge-desc">{a.desc}</span>
-                {unlocked && <Badge size="small" color="primary" variant="faded" rounded>Unlocked</Badge>}
+              <div key={a.id} className={`ach-tile ${has ? '' : 'locked'}`} style={{ '--i': i }} title={a.desc}>
+                <div className="ach-icon" style={has ? { background: 'linear-gradient(135deg, rgba(245,158,11,0.2), rgba(236,72,153,0.15))', color: '#f59e0b' } : { background: 'var(--surface-2)', color: 'var(--text-faint)' }}>
+                  <DynIcon name={a.icon} size={20} />
+                </div>
+                <b style={{ fontSize: '0.76rem' }}>{a.name}</b>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-faint)', lineHeight: 1.3 }}>{a.desc}</span>
+                {has && <span className="chip" style={{ color: 'var(--accent)', fontSize: '0.58rem', padding: '1px 7px' }}>+50 XP</span>}
               </div>
             );
           })}
         </div>
-      </View>
+      </div>
     </div>
   );
 }

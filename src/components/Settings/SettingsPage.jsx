@@ -1,199 +1,158 @@
-import React, { useState } from 'react';
-import { View, Text, Button, Icon, Badge, Divider } from 'reshaped';
-import { Sun, Moon, Lock, Unlock, Download, Upload, Shield, Eye, EyeOff, Plus, Trash2, Palette } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import {
+  Settings as SettingsIcon, Sun, Moon, Upload, DatabaseZap, Trash2, Cpu,
+  RefreshCw, CheckCircle2, XCircle, FileJson, HardDriveDownload, Info,
+} from 'lucide-react';
 import { useStore } from '../../lib/store';
-import { saveSetting, getSetting, hashPassword, verifyPassword, createSubject, updateSubject, deleteSubject } from '../../lib/db';
-import { downloadObsidianVault } from '../../lib/obsidian';
-import DynIcon from '../Shared/DynIcon';
-import IconPicker from '../Shared/IconPicker';
-import ColorPicker from '../Shared/ColorPicker';
-import { COLORS, HABIT_ICON_NAMES } from '../../lib/constants';
+import { isOllamaAvailable, getOllamaModels } from '../../lib/ollama';
+import { buildVault, vaultToMarkdown, download } from '../../lib/obsidian';
 
-export default function SettingsPage({ refreshData }) {
-  const { colorMode, setColorMode, passwordEnabled, setPasswordEnabled, habits, completions, journalEntries, tasks, subjects, addToast } = useStore();
-  const [currentPwd, setCurrentPwd] = useState('');
-  const [newPwd, setNewPwd] = useState('');
-  const [confirmPwd, setConfirmPwd] = useState('');
-  const [pwdMsg, setPwdMsg] = useState('');
-  const [showPwd, setShowPwd] = useState(false);
-  const [showSubjectForm, setShowSubjectForm] = useState(false);
-  const [editingSubject, setEditingSubject] = useState(null);
-  const [subjectForm, setSubjectForm] = useState({ name: '', color: '#3b82f6', icon: 'BookOpen' });
-  const [showIconPicker, setShowIconPicker] = useState(false);
+export default function SettingsPage({ theme, onToggleTheme }) {
+  const s = useStore();
+  const fileRef = useRef(null);
+  const [aiState, setAiState] = useState(null); // null | 'checking' | {ok, models}
 
-  async function toggleTheme() {
-    const m = colorMode === 'light' ? 'dark' : 'light';
-    setColorMode(m); await saveSetting('theme', m);
-    addToast({ type: 'info', message: `Theme changed to ${m}` });
-  }
+  const exportJson = () => {
+    const snap = s.exportSnapshot();
+    download(`habitt-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(snap, null, 2), 'application/json');
+    s.setSetting('exported', true);
+    s.addToast({ type: 'success', message: 'Backup exported' });
+    s.checkAchievements();
+  };
 
-  async function setPassword() {
-    if (newPwd.length < 4) { setPwdMsg('Min 4 characters'); return; }
-    if (newPwd !== confirmPwd) { setPwdMsg('Passwords do not match'); return; }
-    await saveSetting('password_hash', await hashPassword(newPwd));
-    setPasswordEnabled(true); setPwdMsg('Password set!'); setNewPwd(''); setConfirmPwd('');
-    addToast({ type: 'success', message: 'Password enabled' });
-  }
+  const exportVault = () => {
+    const files = buildVault(s);
+    download(`habitt-vault-${new Date().toISOString().slice(0, 10)}.md`, vaultToMarkdown(files));
+    s.setSetting('exported', true);
+    s.addToast({ type: 'success', message: `Obsidian vault exported — ${files.length} notes` });
+    s.checkAchievements();
+  };
 
-  async function removePassword() {
-    if (!currentPwd) { setPwdMsg('Enter current password'); return; }
-    const valid = await verifyPassword(currentPwd, await getSetting('password_hash'));
-    if (!valid) { setPwdMsg('Incorrect'); return; }
-    await saveSetting('password_hash', ''); setPasswordEnabled(false); setCurrentPwd('');
-    addToast({ type: 'info', message: 'Password removed' });
-  }
+  const importJson = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(String(reader.result));
+        if (!data || typeof data !== 'object' || !('habits' in data)) throw new Error('bad format');
+        s.importData(data);
+        setTimeout(() => s.checkAchievements(), 100);
+      } catch {
+        s.addToast({ type: 'error', message: 'That file is not a valid Habitt backup' });
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
 
-  function exportData() {
-    const data = { habits, completions, journalEntries, tasks, subjects, exportedAt: new Date().toISOString() };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = `habitt-export-${new Date().toISOString().split('T')[0]}.json`; a.click();
-    addToast({ type: 'success', message: 'Data exported!' });
-  }
+  const checkAI = async () => {
+    setAiState('checking');
+    const ok = await isOllamaAvailable();
+    const models = ok ? await getOllamaModels() : [];
+    setAiState({ ok, models });
+  };
 
-  function exportObsidian() {
-    downloadObsidianVault(journalEntries, habits, completions, tasks);
-    addToast({ type: 'success', message: 'Obsidian vault exported!' });
-  }
-
-  async function handleSaveSubject() {
-    if (!subjectForm.name.trim()) return;
-    if (editingSubject) { await updateSubject(editingSubject.id, subjectForm); }
-    else { await createSubject(subjectForm); }
-    await refreshData();
-    setShowSubjectForm(false); setEditingSubject(null);
-    setSubjectForm({ name: '', color: '#3b82f6', icon: 'BookOpen' });
-    addToast({ type: 'success', message: editingSubject ? 'Subject updated' : 'Subject created' });
-  }
-
-  async function handleDeleteSubject(id) {
-    if (confirm('Delete this subject? Associated homework will also be removed.')) {
-      await deleteSubject(id); await refreshData();
-      addToast({ type: 'info', message: 'Subject deleted' });
-    }
-  }
-
-  const inputStyle = { padding: '8px 12px', borderRadius: 12, width: '100%', border: '1px solid var(--rs-color-border-neutral-faded)', background: 'var(--rs-color-background-neutral-default)', color: 'var(--rs-color-foreground-neutral-default)', fontSize: '0.875rem' };
+  const counts = [
+    { l: 'Habits', v: s.habits.length }, { l: 'Check-ins', v: s.completions.length },
+    { l: 'Journal', v: s.journalEntries.length }, { l: 'Tasks', v: s.tasks.length },
+    { l: 'Homework', v: s.homework.length }, { l: 'Notes', v: s.notes.length },
+    { l: 'Day notes', v: s.dayNotes.length }, { l: 'Focus (min)', v: s.focusSessions.reduce((a, f) => a + (f.duration_minutes || 0), 0) },
+  ];
+  const bytes = (() => { try { return new Blob([JSON.stringify(useStore.getState(), (k, v) => (typeof v === 'function' ? undefined : v))]).size; } catch { return 0; } })();
 
   return (
-    <div className="animate-fade-in" style={{ maxWidth: 750 }}>
-      <Text variant="title-1" weight="bold" marginBottom={1}>Settings</Text>
-      <Text variant="body-2" color="neutral-faded" marginBottom={6}>Customize your Habitt experience</Text>
+    <div style={{ maxWidth: 780 }}>
+      <div className="page-head">
+        <h2 className="page-title"><SettingsIcon size={22} color="var(--text-muted)" /> Settings</h2>
+        <p className="page-sub">Everything lives on this device. No accounts, no cloud, no tracking.</p>
+      </div>
 
-      {/* Appearance */}
-      <View padding={5} marginBottom={4} style={{ background: 'var(--rs-color-background-neutral-default)', border: '1px solid var(--rs-color-border-neutral-faded)', borderRadius: 16 }}>
-        <Text variant="title-3" weight="bold" marginBottom={4}>Appearance</Text>
-        <View direction="row" align="center" style={{ justifyContent: 'space-between' }}>
-          <View><Text variant="body-2" weight="bold">Theme</Text><Text variant="caption-1" color="neutral-faded">Light or dark mode</Text></View>
-          <Button variant="faded" color="neutral" startIcon={<Icon svg={colorMode==='light'?<Sun size={16}/>:<Moon size={16}/>} />} onClick={toggleTheme}>
-            {colorMode==='light'?'Light':'Dark'}
-          </Button>
-        </View>
-      </View>
+      <Section icon={<span style={{ fontSize: 16 }}>🎨</span>} title="Appearance">
+        <Row title="Theme" desc="Light or dark — follows your system by default until you choose.">
+          <button className="btn" onClick={onToggleTheme}>{theme === 'dark' ? <Moon size={15} /> : <Sun size={15} />} {theme === 'dark' ? 'Dark' : 'Light'}</button>
+        </Row>
+      </Section>
 
-      {/* Subjects (for Homework) */}
-      <View padding={5} marginBottom={4} style={{ background: 'var(--rs-color-background-neutral-default)', border: '1px solid var(--rs-color-border-neutral-faded)', borderRadius: 16 }}>
-        <View direction="row" align="center" gap={2} marginBottom={4} style={{ justifyContent: 'space-between' }}>
-          <Text variant="title-3" weight="bold">Subjects</Text>
-          <Button size="small" color="primary" onClick={() => { setShowSubjectForm(!showSubjectForm); setEditingSubject(null); setSubjectForm({ name: '', color: '#3b82f6', icon: 'BookOpen' }); }}
-            startIcon={<Icon svg={<Plus size={14} />} />}>Add Subject</Button>
-        </View>
-        <Text variant="caption-1" color="neutral-faded" marginBottom={3}>Subjects are used to color-code homework assignments</Text>
-
-        {showSubjectForm && (
-          <View padding={4} marginBottom={3} className="animate-slide-up" style={{ background: 'var(--rs-color-background-neutral-faded)', borderRadius: 14 }}>
-            <View gap={3}>
-              <input value={subjectForm.name} onChange={e => setSubjectForm(f => ({ ...f, name: e.target.value }))}
-                placeholder="Subject name (e.g. Mathematics)" style={inputStyle} autoFocus />
-              <View>
-                <Text variant="caption-1" weight="bold" color="neutral-faded" marginBottom={2}>Color</Text>
-                <ColorPicker selected={subjectForm.color} onSelect={c => setSubjectForm(f => ({ ...f, color: c }))} />
-              </View>
-              <View>
-                <Text variant="caption-1" weight="bold" color="neutral-faded" marginBottom={2}>Icon</Text>
-                <button onClick={() => setShowIconPicker(!showIconPicker)} style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 12,
-                  border: '1px solid var(--rs-color-border-neutral-faded)', background: 'var(--rs-color-background-neutral-default)', cursor: 'pointer',
-                }}>
-                  <DynIcon name={subjectForm.icon} size={20} color={subjectForm.color} />
-                  <Text variant="body-3">{subjectForm.icon}</Text>
-                </button>
-                {showIconPicker && <div style={{ marginTop: 8 }}><IconPicker selected={subjectForm.icon} onSelect={n => { setSubjectForm(f => ({ ...f, icon: n })); setShowIconPicker(false); }} color={subjectForm.color} /></div>}
-              </View>
-              <View direction="row" gap={2} style={{ justifyContent: 'flex-end' }}>
-                <Button variant="faded" color="neutral" onClick={() => setShowSubjectForm(false)}>Cancel</Button>
-                <Button color="primary" onClick={handleSaveSubject}>Save Subject</Button>
-              </View>
-            </View>
-          </View>
-        )}
-
-        <View gap={2}>
-          {subjects.length === 0 ? (
-            <Text variant="body-3" color="neutral-faded" style={{ fontStyle: 'italic' }}>No subjects yet. Add your school subjects above.</Text>
-          ) : subjects.map(sub => (
-            <View key={sub.id} direction="row" align="center" gap={3} padding={3} style={{
-              borderRadius: 12, border: '1px solid var(--rs-color-border-neutral-faded)',
-              borderLeft: `4px solid ${sub.color}`,
-            }}>
-              <DynIcon name={sub.icon || 'BookOpen'} size={20} color={sub.color} />
-              <Text variant="body-2" weight="bold" style={{ flex: 1, color: sub.color }}>{sub.name}</Text>
-              <button onClick={() => { setEditingSubject(sub); setSubjectForm({ name: sub.name, color: sub.color, icon: sub.icon || 'BookOpen' }); setShowSubjectForm(true); }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--rs-color-foreground-neutral-faded)', fontSize: '0.75rem', fontWeight: 600 }}>Edit</button>
-              <button onClick={() => handleDeleteSubject(sub.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--rs-color-foreground-critical-default)' }}>
-                <Trash2 size={14} />
-              </button>
-            </View>
+      <Section icon={<Cpu size={16} color="var(--violet)" />} title="Local AI (Ollama)">
+        <Row title="Use Ollama for journal reflections" desc="If Ollama is running on this machine (localhost:11434), your daily reflection is generated locally by a model. Without it, a built-in on-device engine writes the reflection instead — the app never phones home.">
+          <label className="switch">
+            <input type="checkbox" checked={!!s.settings.ollamaEnabled} onChange={(e) => s.setSetting('ollamaEnabled', e.target.checked)} />
+            <span className="track" /><span className="thumb" />
+          </label>
+        </Row>
+        <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button className="btn btn-sm" onClick={checkAI} disabled={aiState === 'checking'}>
+            {aiState === 'checking' ? <span className="spinner" /> : <RefreshCw size={13} />} Test connection
+          </button>
+          {aiState && aiState !== 'checking' && (aiState.ok ? (
+            <>
+              <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', color: 'var(--accent)', fontWeight: 700, fontSize: '0.8rem' }}><CheckCircle2 size={14} /> Online · {aiState.models.length} models</span>
+              <select className="select" style={{ width: 220, padding: '6px 10px', fontSize: '0.8rem' }} value={s.settings.ollamaModel || ''} onChange={(e) => s.setSetting('ollamaModel', e.target.value)}>
+                <option value="">Auto (llama3.2)</option>
+                {aiState.models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
+              </select>
+            </>
+          ) : (
+            <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', color: 'var(--text-faint)', fontWeight: 650, fontSize: '0.8rem' }}><XCircle size={14} /> Not running — falling back to built-in reflections</span>
           ))}
-        </View>
-      </View>
+        </div>
+      </Section>
 
-      {/* Password */}
-      <View padding={5} marginBottom={4} style={{ background: 'var(--rs-color-background-neutral-default)', border: '1px solid var(--rs-color-border-neutral-faded)', borderRadius: 16 }}>
-        <Text variant="title-3" weight="bold" marginBottom={2}>Password Protection</Text>
-        <Text variant="caption-1" color="neutral-faded" marginBottom={4}>Optionally protect with a password</Text>
-        {passwordEnabled ? (
-          <View gap={3}>
-            <View padding={3} style={{ background: 'rgba(34,197,94,0.08)', borderRadius: 10 }}><Text variant="body-3" color="success">Password enabled</Text></View>
-            <input type={showPwd?'text':'password'} value={currentPwd} onChange={e=>setCurrentPwd(e.target.value)} placeholder="Current password" style={inputStyle} />
-            <Button variant="faded" color="critical" onClick={removePassword} startIcon={<Icon svg={<Unlock size={14}/>} />}>Remove</Button>
-          </View>
-        ) : (
-          <View gap={3}>
-            <input type="password" value={newPwd} onChange={e=>setNewPwd(e.target.value)} placeholder="New password (min 4)" style={inputStyle} />
-            <input type="password" value={confirmPwd} onChange={e=>setConfirmPwd(e.target.value)} placeholder="Confirm" style={inputStyle} />
-            <Button color="primary" onClick={setPassword} startIcon={<Icon svg={<Lock size={14}/>} />}>Set Password</Button>
-          </View>
-        )}
-        {pwdMsg && <Text variant="caption-1" color={pwdMsg.includes('set')||pwdMsg.includes('removed')?'success':'critical'} marginTop={2}>{pwdMsg}</Text>}
-      </View>
-
-      {/* Data */}
-      <View padding={5} marginBottom={4} style={{ background: 'var(--rs-color-background-neutral-default)', border: '1px solid var(--rs-color-border-neutral-faded)', borderRadius: 16 }}>
-        <Text variant="title-3" weight="bold" marginBottom={4}>Data Management</Text>
-        <View direction="row" gap={2} marginBottom={4} style={{ flexWrap: 'wrap' }}>
-          <Button variant="faded" color="neutral" onClick={exportData} startIcon={<Icon svg={<Download size={14}/>} />}>Export JSON</Button>
-          <Button variant="faded" color="neutral" onClick={exportObsidian} startIcon={<Icon svg={<Download size={14}/>} />}>Export Obsidian Vault</Button>
-          <Button variant="faded" color="neutral" onClick={() => {
-            const input = document.createElement('input'); input.type='file'; input.accept='.json';
-            input.onchange = async (e) => { addToast({ type: 'info', message: 'Import coming soon!' }); };
-            input.click();
-          }} startIcon={<Icon svg={<Upload size={14}/>} />}>Import</Button>
-        </View>
-        <View direction="row" gap={6}>
-          {[{v:habits.length,l:'Habits'},{v:completions.length,l:'Completions'},{v:journalEntries.length,l:'Journals'},{v:tasks.length,l:'Tasks'},{v:subjects.length,l:'Subjects'}].map((s,i)=>(
-            <View key={i} align="center"><Text variant="display-2" weight="bold" color="primary">{s.v}</Text><Text variant="caption-1" color="neutral-faded">{s.l}</Text></View>
+      <Section icon={<DatabaseZap size={16} color="var(--blue)" />} title="Data">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, margin: '4px 0 14px' }}>
+          {counts.map((c) => (
+            <div key={c.l} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 12, padding: '10px 12px', textAlign: 'center' }}>
+              <div style={{ fontWeight: 850, fontSize: '1.15rem' }}>{c.v}</div>
+              <div style={{ fontSize: '0.64rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-faint)', fontWeight: 750 }}>{c.l}</div>
+            </div>
           ))}
-        </View>
-      </View>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="btn" onClick={exportJson}><FileJson size={14} /> Export JSON backup</button>
+          <button className="btn" onClick={exportVault}><HardDriveDownload size={14} /> Export Obsidian vault (.md)</button>
+          <button className="btn" onClick={() => fileRef.current?.click()}><Upload size={14} /> Import backup</button>
+          <input ref={fileRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={importJson} />
+        </div>
+        <p style={{ fontSize: '0.72rem', color: 'var(--text-faint)', margin: '10px 0 0', fontWeight: 600 }}>
+          {bytes > 0 ? `Local database: ${(bytes / 1024).toFixed(1)} KB in your browser/app storage.` : ''} The vault export uses `%% ── FILE: path ── %%` separators so you can split it into Obsidian notes.
+        </p>
+        <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+          <Row title="Danger zone" desc="Deletes habits, history, journal, tasks, notes, XP — everything. Export first.">
+            <button className="btn btn-danger" onClick={() => { if (confirm('Really delete ALL Habitt data? This cannot be undone.') && confirm('Are you absolutely sure?')) { s.clearAllData(); } }}>
+              <Trash2 size={14} /> Clear all data
+            </button>
+          </Row>
+        </div>
+      </Section>
 
-      {/* About */}
-      <View padding={5} style={{ background: 'var(--rs-color-background-neutral-default)', border: '1px solid var(--rs-color-border-neutral-faded)', borderRadius: 16 }}>
-        <Text variant="title-3" weight="bold" marginBottom={3}>About</Text>
-        <Text variant="body-2"><strong>Habitt</strong> v1.0.0</Text>
-        <Text variant="body-3" color="neutral-faded" marginTop={1}>Privacy-first habit tracker. All data local. No cloud, no ads.</Text>
-        <Text variant="caption-1" color="neutral-faded" marginTop={2}>React + Reshaped UI + Lucide Icons + Tauri + SQLite + Ollama AI</Text>
-      </View>
+      <Section icon={<Info size={16} color="var(--amber)" />} title="About">
+        <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+          <b style={{ color: 'var(--text)' }}>Habitt.</b> v2.0.0 — a privacy-first habit tracker with heatmaps, streaks, journaling, tasks, homework, notes, a focus timer, XP and achievements.
+          Built with React, Vite and Tauri. Your data is stored locally (SQLite in the desktop app, browser storage on the web).
+        </p>
+      </Section>
+    </div>
+  );
+}
+
+function Section({ icon, title, children }) {
+  return (
+    <section className="card card-pad" style={{ marginBottom: 16 }}>
+      <h3 style={{ margin: '0 0 10px', fontSize: '0.92rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>{icon} {title}</h3>
+      {children}
+    </section>
+  );
+}
+
+function Row({ title, desc, children }) {
+  return (
+    <div className="settings-row">
+      <div style={{ flex: 1, minWidth: 200 }}>
+        <div style={{ fontWeight: 750, fontSize: '0.88rem' }}>{title}</div>
+        {desc && <div style={{ fontSize: '0.76rem', color: 'var(--text-faint)', marginTop: 2, lineHeight: 1.45, maxWidth: 480 }}>{desc}</div>}
+      </div>
+      {children}
     </div>
   );
 }

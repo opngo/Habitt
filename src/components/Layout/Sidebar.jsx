@@ -1,115 +1,93 @@
 import React from 'react';
-import { useStore } from '../../lib/store';
-import { View, Text, Icon, Badge, Divider } from 'reshaped';
-import {
-  LayoutDashboard, BookOpen, BarChart3, Settings, HelpCircle,
-  Flame, Target, Trophy, Zap, ChevronRight, Sprout,
-  ListChecks, GraduationCap, FileText, Timer
-} from 'lucide-react';
+import { LayoutDashboard, ListChecks, GraduationCap, StickyNote, BookOpen, BarChart3, Settings, Flame, Trophy, Sprout } from 'lucide-react';
+import { useStore, levelFor, XP_PER_LEVEL } from '../../lib/store';
+import { getToday } from '../../lib/utils';
+import { expectedOnDate } from '../../lib/utils';
 
-const navItems = [
+const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'tasks', label: 'Tasks', icon: ListChecks },
   { id: 'homework', label: 'Homework', icon: GraduationCap },
-  { id: 'notes', label: 'Notes', icon: FileText },
+  { id: 'notes', label: 'Notes', icon: StickyNote },
   { id: 'journal', label: 'Journal', icon: BookOpen },
   { id: 'stats', label: 'Statistics', icon: BarChart3 },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
 export default function Sidebar() {
-  const { currentView, setView, habits, completions, tasks, homework, xp, level } = useStore();
-  const activeHabits = habits.filter(h => !h.archived);
-  const today = new Date().toISOString().split('T')[0];
-  const todayDone = completions.filter(c => c.date === today).length;
-  const pendingTasks = tasks.filter(t => t.status !== 'done' && !t.parent_id).length;
-  const pendingHW = homework.filter(h => h.status !== 'completed').length;
+  const { currentView, setView, habits, completions, tasks, homework, xp, vacationPeriods } = useStore();
+  const today = getToday();
+  const expected = expectedOnDate(habits, vacationPeriods, today);
+  const doneToday = expected.filter((h) =>
+    completions.some((c) => c.habit_id === h.id && c.date === today && (h.habit_type !== 'amount' || (c.amount || c.count || 0) >= (h.target_count || 1)))
+  ).length;
+  const pendingTasks = tasks.filter((t) => t.status !== 'done' && !t.parent_id).length;
+  const pendingHW = homework.filter((h) => h.status !== 'completed').length;
+  const level = levelFor(xp);
+  const pct = xp % XP_PER_LEVEL;
 
   return (
     <aside className="app-sidebar">
-      <View padding={5} gap={4} height="100%" direction="column">
-        <View direction="row" align="center" gap={2} paddingBottom={3}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: 'linear-gradient(135deg, #22c55e, #16a34a)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'white', boxShadow: '0 4px 12px rgba(34,197,94,0.3)'
-          }}><Sprout size={18} /></div>
-          <View>
-            <Text variant="title-3" weight="bold">Habitt</Text>
-            <Text variant="caption-1" color="neutral-faded">Build better habits</Text>
-          </View>
-        </View>
-
-        <Divider />
-
-        <View gap={1}>
-          {navItems.map(item => {
-            const isActive = currentView === item.id;
-            const badge = item.id === 'tasks' ? pendingTasks : item.id === 'homework' ? pendingHW : null;
-            return (
-              <button key={item.id} onClick={() => setView(item.id)} style={{
-                display: 'flex', alignItems: 'center', gap: '0.75rem',
-                width: '100%', padding: '0.625rem 0.75rem', borderRadius: '12px',
-                background: isActive ? 'var(--rs-color-background-primary-faded)' : 'transparent',
-                border: 'none', cursor: 'pointer', transition: 'all 0.15s',
-                color: isActive ? 'var(--rs-color-foreground-primary-default)' : 'var(--rs-color-foreground-neutral-default)',
-                fontWeight: isActive ? 600 : 500, fontSize: '0.875rem',
-              }}
-              onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--rs-color-background-neutral-faded)'; }}
-              onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}>
-                <Icon svg={<item.icon size={18} />} />
-                <span style={{ flex: 1, textAlign: 'left' }}>{item.label}</span>
-                {badge > 0 && <Badge size="small" color="critical" variant="faded" rounded>{badge}</Badge>}
-                {isActive && <ChevronRight size={14} />}
-              </button>
-            );
-          })}
-        </View>
-
-        <Divider />
-
-        <View gap={2}>
-          <Text variant="caption-1" weight="bold" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>Today</Text>
-          <View direction="row" align="center" gap={2} padding={2} style={{ background: 'var(--rs-color-background-neutral-faded)', borderRadius: '12px' }}>
-            <Flame size={18} color="#f97316" />
-            <Text variant="body-2" style={{ flex: 1 }}>{todayDone}/{activeHabits.length} done</Text>
-          </View>
-          <View direction="row" align="center" gap={2} padding={2} style={{
-            background: 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(59,130,246,0.04))',
-            borderRadius: '12px', border: '1px solid rgba(139,92,246,0.15)'
-          }}>
-            <Trophy size={18} color="#8b5cf6" />
-            <View style={{ flex: 1 }}>
-              <Text variant="caption-1" weight="bold">Level {level}</Text>
-              <div style={{ height: 4, borderRadius: 99, background: 'var(--rs-color-background-neutral-faded)', marginTop: 4, overflow: 'hidden' }}>
-                <div style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #8b5cf6, #3b82f6)', width: `${xp % 100}%`, transition: 'width 0.5s' }} />
-              </div>
-            </View>
-            <Badge rounded color="primary" variant="faded" size="small">{xp} XP</Badge>
-          </View>
-        </View>
-
-        <div style={{ marginTop: 'auto' }}>
-          <Divider />
-          <View paddingTop={2}>
-            <button onClick={() => setView('tutorial')} style={{
-              display: 'flex', alignItems: 'center', gap: '0.75rem',
-              width: '100%', padding: '0.5rem 0.75rem', borderRadius: '12px',
-              background: 'transparent', border: 'none', cursor: 'pointer',
-              color: 'var(--rs-color-foreground-neutral-faded)', fontSize: '0.8125rem',
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--rs-color-background-neutral-faded)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-              <HelpCircle size={16} /><span>Help and Tutorial</span>
-            </button>
-            <View direction="row" align="center" gap={1} padding={2} style={{ justifyContent: 'center' }}>
-              <Zap size={12} color="var(--rs-color-foreground-neutral-faded)" />
-              <Text variant="caption-2" color="neutral-faded">Ctrl+K for commands</Text>
-            </View>
-          </View>
+      <div className="brand" onClick={() => setView('dashboard')} title="Habitt — dashboard">
+        <div className="brand-mark"><Sprout size={20} /></div>
+        <div className="brand-text">
+          <div className="brand-name">Habitt<em>.</em></div>
+          <div className="brand-sub">Build better days</div>
         </div>
-      </View>
+      </div>
+
+      <div className="nav-label">Menu</div>
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {NAV.map((item) => {
+          const active = currentView === item.id;
+          const count = item.id === 'tasks' ? pendingTasks : item.id === 'homework' ? pendingHW : null;
+          return (
+            <button key={item.id} className={`nav-item ${active ? 'active' : ''}`} onClick={() => setView(item.id)} title={item.label}>
+              <item.icon size={17} />
+              <span className="hide-mobile" style={{ flex: 1, textAlign: 'left' }}>{item.label}</span>
+              {count > 0 && <span className="nav-count">{count}</span>}
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="nav-sep" />
+      <div className="nav-label hide-mobile">Today</div>
+
+      <div className="side-stat">
+        <Flame size={18} color="#f97316" />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 800, fontSize: '0.86rem' }}>{doneToday}/{expected.length}</div>
+          <div style={{ color: 'var(--text-faint)', fontSize: '0.7rem', fontWeight: 600 }}>habits done today</div>
+        </div>
+        {expected.length > 0 && (
+          <div style={{ width: 34, height: 34, borderRadius: '50%', background: `conic-gradient(#22c55e ${Math.round((doneToday / expected.length) * 360)}deg, var(--surface-3) 0deg)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', fontWeight: 800 }}>
+              {Math.round((doneToday / expected.length) * 100)}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="level-card">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
+          <Trophy size={16} color="#8b5cf6" />
+          <span style={{ fontWeight: 800, fontSize: '0.84rem' }}>Level {level}</span>
+          <span className="chip hide-mobile" style={{ marginLeft: 'auto' }}>{xp} XP</span>
+        </div>
+        <div className="progress-track">
+          <div className="progress-fill" style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #8b5cf6, #3b82f6)' }} />
+        </div>
+        <div className="hide-mobile" style={{ fontSize: '0.66rem', color: 'var(--text-faint)', marginTop: 5, fontWeight: 600 }}>
+          {XP_PER_LEVEL - pct} XP to level {level + 1}
+        </div>
+      </div>
+
+      <div style={{ marginTop: 'auto' }} className="hide-mobile">
+        <div style={{ fontSize: '0.66rem', color: 'var(--text-faint)', textAlign: 'center', padding: '8px 0 2px', fontWeight: 600 }}>
+          <b>Ctrl+K</b> commands · <b>Ctrl+N</b> new habit
+        </div>
+      </div>
     </aside>
   );
 }

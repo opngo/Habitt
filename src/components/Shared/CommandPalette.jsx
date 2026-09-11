@@ -1,91 +1,90 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { View, Text, Icon } from 'reshaped';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Plus, LayoutDashboard, BookOpen, BarChart3, Settings, Search,
-  Flame, Moon, Sun, Zap, Trash2, Archive
+  LayoutDashboard, ListChecks, GraduationCap, StickyNote, BookOpen, BarChart3, Settings,
+  Plus, Zap, Timer, Sun, Moon, Search, CornerDownLeft, Download, Sparkles,
 } from 'lucide-react';
 import { useStore } from '../../lib/store';
+import { getToday } from '../../lib/utils';
+import DynIcon from './DynIcon';
+
+const NAV = [
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, keywords: 'home habits today' },
+  { id: 'tasks', label: 'Tasks', icon: ListChecks, keywords: 'todo kanban' },
+  { id: 'homework', label: 'Homework', icon: GraduationCap, keywords: 'school assignments subjects' },
+  { id: 'notes', label: 'Notes', icon: StickyNote, keywords: 'memos writing' },
+  { id: 'journal', label: 'Journal', icon: BookOpen, keywords: 'mood diary' },
+  { id: 'stats', label: 'Statistics', icon: BarChart3, keywords: 'analytics achievements xp' },
+  { id: 'settings', label: 'Settings', icon: Settings, keywords: 'theme export import data' },
+];
 
 export default function CommandPalette() {
-  const { setShowCommandPalette, setView, setShowCreateModal, habits,
-    colorMode, setColorMode, setQuickCheckinMode } = useStore();
-  const [query, setQuery] = useState('');
-  const [activeIdx, setActiveIdx] = useState(0);
-  const inputRef = useRef(null);
+  const { setView, setUI, habits, toggleTheme } = useStore();
+  const [q, setQ] = useState('');
+  const [sel, setSel] = useState(0);
+  const listRef = useRef(null);
 
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  const theme = document.documentElement.dataset.theme;
 
-  const commands = useMemo(() => [
-    { id: 'dashboard', label: 'Go to Dashboard', icon: LayoutDashboard, action: () => setView('dashboard') },
-    { id: 'journal', label: 'Go to Journal', icon: BookOpen, action: () => setView('journal') },
-    { id: 'stats', label: 'Go to Statistics', icon: BarChart3, action: () => setView('stats') },
-    { id: 'settings', label: 'Go to Settings', icon: Settings, action: () => setView('settings') },
-    { id: 'new-habit', label: 'Create New Habit', icon: Plus, action: () => { setShowCreateModal(true); } },
-    { id: 'quick-checkin', label: 'Quick Check-in Mode', icon: Zap, action: () => setQuickCheckinMode(true) },
-    { id: 'toggle-theme', label: `Switch to ${colorMode === 'light' ? 'Dark' : 'Light'} Mode`, icon: colorMode === 'light' ? Moon : Sun,
-      action: () => setColorMode(colorMode === 'light' ? 'dark' : 'light') },
-    ...habits.filter(h => !h.archived).map(h => ({
-      id: `habit-${h.id}`, label: `Open: ${h.icon} ${h.name}`,
-      icon: Flame, action: () => setView('habit', h.id),
-    })),
-  ], [habits, colorMode]);
+  const actions = useMemo(() => {
+    const base = [
+      ...NAV.map((n) => ({ ...n, kind: 'Go', run: () => setView(n.id) })),
+      { id: 'new', label: 'Create new habit', icon: Plus, kind: 'Do', keywords: 'add habit create', color: 'var(--accent)', run: () => setUI({ showCreateModal: true, editingHabit: null }) },
+      { id: 'tpl', label: 'Browse habit templates', icon: Sparkles, kind: 'Do', keywords: 'templates presets', run: () => setUI({ showTemplates: true }) },
+      { id: 'qc', label: 'Quick check-in mode', icon: Zap, kind: 'Do', keywords: 'rapid check', color: 'var(--amber)', run: () => setUI({ quickCheckinMode: true }) },
+      { id: 'note', label: 'Add a day note', icon: StickyNote, kind: 'Do', keywords: 'note today journal short', run: () => setUI({ showDayNoteModal: true, dayNoteDate: getToday() }) },
+      { id: 'focus', label: 'Start focus timer', icon: Timer, kind: 'Do', keywords: 'pomodoro work', run: () => setUI({ showFocusTimer: true }) },
+      { id: 'theme', label: `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`, icon: theme === 'dark' ? Sun : Moon, kind: 'Do', keywords: 'theme dark light appearance', run: () => toggleTheme() },
+      { id: 'export', label: 'Export data as JSON backup', icon: Download, kind: 'Do', keywords: 'backup save', run: () => { setView('settings'); } },
+    ];
+    const habitActions = habits
+      .filter((h) => !h.archived)
+      .map((h) => ({
+        id: `h-${h.id}`, label: `Toggle “${h.name}” today`, icon: h.icon, kind: 'Habit',
+        keywords: `${h.name} ${h.category}`, color: h.color,
+        run: () => useStore.getState().toggleCompletion(h.id, getToday()),
+      }));
+    const all = [...base, ...habitActions];
+    if (!q.trim()) return all;
+    const ql = q.toLowerCase();
+    return all.filter((a) => `${a.label} ${a.keywords || ''} ${a.kind}`.toLowerCase().includes(ql));
+  }, [q, habits, theme]); // eslint-disable-line
 
-  const filtered = useMemo(() =>
-    commands.filter(c => c.label.toLowerCase().includes(query.toLowerCase())),
-    [commands, query]
-  );
+  useEffect(() => setSel(0), [q]);
+  useEffect(() => {
+    const el = listRef.current?.querySelector('[data-sel="1"]');
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [sel]);
 
-  function execute(cmd) {
-    cmd.action();
-    setShowCommandPalette(false);
-  }
-
-  function handleKeyDown(e) {
-    if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx(i => Math.min(i + 1, filtered.length - 1)); }
-    if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx(i => Math.max(i - 1, 0)); }
-    if (e.key === 'Enter' && filtered[activeIdx]) execute(filtered[activeIdx]);
-    if (e.key === 'Escape') setShowCommandPalette(false);
-  }
+  const run = (a) => { a.run(); setUI({ showCommandPalette: false }); };
 
   return (
-    <div className="command-palette-overlay" onClick={(e) => e.target === e.currentTarget && setShowCommandPalette(false)}>
-      <div className="command-palette animate-scale-in">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 1.25rem', borderBottom: '1px solid var(--rs-color-border-neutral-faded)' }}>
-          <Search size={16} color="var(--rs-color-foreground-neutral-faded)" />
+    <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) setUI({ showCommandPalette: false }); }}>
+      <div className="modal palette">
+        <div className="palette-input-row">
+          <Search size={17} color="var(--text-faint)" />
           <input
-            ref={inputRef}
-            value={query}
-            onChange={e => { setQuery(e.target.value); setActiveIdx(0); }}
-            onKeyDown={handleKeyDown}
-            placeholder="Type a command or search..."
+            className="palette-input" autoFocus placeholder="Type a command, habit, or page…"
+            value={q} onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') { e.stopPropagation(); setUI({ showCommandPalette: false }); }
+              if (e.key === 'ArrowDown') { e.preventDefault(); setSel((s) => Math.min(actions.length - 1, s + 1)); }
+              if (e.key === 'ArrowUp') { e.preventDefault(); setSel((s) => Math.max(0, s - 1)); }
+              if (e.key === 'Enter' && actions[sel]) { e.preventDefault(); run(actions[sel]); }
+            }}
           />
+          <span className="chip">↑↓ ↵</span>
         </div>
-        <div style={{ maxHeight: 320, overflow: 'auto', padding: '4px 0' }}>
-          {filtered.length === 0 && (
-            <View padding={4} align="center">
-              <Text variant="body-3" color="neutral-faded">No results found</Text>
-            </View>
-          )}
-          {filtered.map((cmd, i) => (
-            <div
-              key={cmd.id}
-              className={`command-item ${i === activeIdx ? 'active' : ''}`}
-              onClick={() => execute(cmd)}
-              onMouseEnter={() => setActiveIdx(i)}
-            >
-              <cmd.icon size={16} />
-              <Text variant="body-3">{cmd.label}</Text>
-            </div>
+        <div className="palette-list" ref={listRef}>
+          {actions.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.85rem' }}>Nothing matches “{q}”</div>}
+          {actions.map((a, i) => (
+            <button key={a.id + i} data-sel={i === sel ? '1' : undefined} className={`palette-item ${i === sel ? 'sel' : ''}`} onMouseEnter={() => setSel(i)} onClick={() => run(a)}>
+              {a.icon && (a.kind === 'Habit' ? <DynIcon name={a.icon} size={15} color={a.color} /> : React.createElement(a.icon, { size: 15, color: a.color }))}
+              <span style={{ flex: 1 }}>{a.label}</span>
+              <span className="hint">{a.kind === 'Go' ? 'Open' : a.kind}</span>
+              {i === sel && <CornerDownLeft size={12} color="var(--text-faint)" />}
+            </button>
           ))}
         </div>
-        <View padding={2} style={{
-          borderTop: '1px solid var(--rs-color-border-neutral-faded)',
-          justifyContent: 'center',
-        }}>
-          <Text variant="caption-2" color="neutral-faded">
-            ↑↓ Navigate • Enter to select • Esc to close
-          </Text>
-        </View>
       </div>
     </div>
   );

@@ -3,7 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Habitt. - Habit Tracker</title>
+    <meta name="description" content="Habitt. — a beautiful, privacy-first habit tracker with heatmaps, streaks, journaling, tasks and focus timer. All data stays on your device." />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>Habitt. — Habit Tracker</title>
+    <style>
+      html { background: #f7f7f8; }
+      html[data-theme="dark"] { background: #0d1017; }
+    </style>
+    <script>
+      // Apply theme before first paint to avoid flash
+      try {
+        var s = JSON.parse(localStorage.getItem("habitt-v2") || "{}");
+        var t = s && s.state && s.state.settings && s.state.settings.theme;
+        if (!t) t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
