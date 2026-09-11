@@ -20,6 +20,43 @@
         document.documentElement.dataset.theme = t;
       } catch (e) {}
     </script>
+    <script>
+      // Boot watchdog: if a module fetch fails or the app never mounts (e.g. a
+      // stale cached page pointing at pruned dev-server chunks), reload once
+      // through a cache-busting URL instead of leaving a black screen.
+      (function () {
+        var KEY = "habitt-boot-heal";
+        function attempts() { try { return Number(sessionStorage.getItem(KEY) || "0"); } catch (e) { return 0; } }
+        function heal(reason) {
+          // reload through a fresh URL at most twice, then give up and show a message
+          if (attempts() >= 2) return false;
+          try { sessionStorage.setItem(KEY, String(attempts() + 1)); } catch (e) {}
+          var u = new URL(location.href);
+          u.searchParams.set("fresh", String(Date.now()));
+          location.replace(u.toString());
+          return true;
+        }
+        window.addEventListener(
+          "error",
+          function (e) {
+            var t = e.target || {};
+            var isAppScript = t.tagName === "SCRIPT" && /\/(src|node_modules|@vite|@react-refresh)\//.test(t.src || "");
+            if (isAppScript || (!e.message && t === window)) heal("fail:" + (t.src || e.message || "module"));
+          },
+          true
+        );
+        setTimeout(function () {
+          if (document.querySelector("#root *")) return;
+          if (!heal("timeout") && tried()) {
+            var d = document.createElement("div");
+            d.textContent = "Habitt could not finish starting in this preview. Please hard-reload (Ctrl+Shift+R) or open the preview in a new tab.";
+            d.style.cssText =
+              "position:fixed;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;font:600 14px system-ui,sans-serif;color:#cbd5e1;background:#0d1017;z-index:9999";
+            (document.body || document.documentElement).appendChild(d);
+          }
+        }, 6000);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
