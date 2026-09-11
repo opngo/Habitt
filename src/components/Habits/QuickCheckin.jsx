@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Check, PartyPopper } from 'lucide-react';
+import { X, Check, CheckCircle2 } from 'lucide-react';
 import { useStore } from '../../lib/store';
 import { getToday, expectedOnDate, amountOf } from '../../lib/utils';
 import DynIcon from '../Shared/DynIcon';
@@ -34,9 +34,9 @@ export default function QuickCheckin() {
     <div className="qc-wrap">
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, letterSpacing: '-0.02em' }}>⚡ Quick check-in</h2>
+          <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Quick check-in</h2>
           <p style={{ margin: '3px 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-            {done === items.length ? 'All done. Legend.' : `${done} of ${items.length} left — one tap each, no scrolling around.`}
+            {done === items.length ? 'All done. Clean sweep.' : `${done} of ${items.length} left — one tap each, no scrolling around.`}
           </p>
         </div>
         <div className="progress-track" style={{ flex: 1, maxWidth: 180, marginLeft: 'auto' }}>
@@ -47,7 +47,7 @@ export default function QuickCheckin() {
 
       {allDone && (
         <div className="card animate-scale-in" style={{ padding: '14px 18px', background: 'linear-gradient(135deg, rgba(34,197,94,0.14), rgba(236,72,153,0.10))', display: 'flex', gap: 10, alignItems: 'center', fontWeight: 800 }}>
-          <PartyPopper size={20} color="var(--accent)" /> Perfect day — every habit checked off!
+          <CheckCircle2 size={20} color="var(--accent)" /> Every habit checked off.
         </div>
       )}
 

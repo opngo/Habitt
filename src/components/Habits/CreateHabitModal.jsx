@@ -133,7 +133,7 @@ export default function CreateHabitModal() {
         <div className="field">
           <label className="field-label">Difficulty</label>
           <select className="select" value={f.difficulty} onChange={(e) => set({ difficulty: e.target.value })}>
-            {DIFFICULTIES.map((d) => <option key={d.value} value={d.value}>{d.label} · {d.xp} XP</option>)}
+            {DIFFICULTIES.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
           </select>
         </div>
         <div className="field">

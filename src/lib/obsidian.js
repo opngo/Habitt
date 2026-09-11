@@ -3,7 +3,7 @@
 import { format } from 'date-fns';
 import { toDate } from './utils';
 
-const MOODS = { 1: '😢 Terrible', 2: '😕 Bad', 3: '😐 Okay', 4: '😊 Good', 5: '🤩 Amazing' };
+const MOODS = { 1: 'Terrible', 2: 'Bad', 3: 'Okay', 4: 'Good', 5: 'Amazing' };
 const ENERGY = { 1: 'Exhausted', 2: 'Low', 3: 'Normal', 4: 'High', 5: 'Supercharged' };
 
 function dailyNote(entry, habitsDone, dateStr) {
@@ -16,7 +16,7 @@ function dailyNote(entry, habitsDone, dateStr) {
   md += '---\n\n';
   md += `# ${format(d, 'EEEE, MMMM d, yyyy')}\n\n`;
   md += '## Check-in\n\n| Mood | Energy | Sleep | Habits |\n|---|---|---|---|\n';
-  md += `| ${MOODS[entry.mood] || '😐 Okay'} | ${ENERGY[entry.energy] || 'Normal'} | ${entry.sleep_hours || '?'}h | ${habitsDone.length} done |\n\n`;
+  md += `| ${MOODS[entry.mood] || 'Okay'} | ${ENERGY[entry.energy] || 'Normal'} | ${entry.sleep_hours || '?'}h | ${habitsDone.length} done |\n\n`;
   if (habitsDone.length) {
     md += '## Habits\n\n' + habitsDone.map((h) => `- [x] ${h.name}`).join('\n') + '\n\n';
   }
@@ -58,7 +58,7 @@ export function buildVault({ journalEntries, habits, completions, tasks, notes, 
     path: 'Tasks.md',
     content:
       `---\ntags: ["tasks"]\n---\n\n# Tasks\n\n## Open\n\n` +
-      (open.length ? open.map((t) => `- [ ] ${t.title}${t.due_date ? ` 📅 ${t.due_date}` : ''}`).join('\n') : '_None_') +
+      (open.length ? open.map((t) => `- [ ] ${t.title}${t.due_date ? ` (due ${t.due_date})` : ''}`).join('\n') : '_None_') +
       `\n\n## Completed\n\n` + (done.length ? done.map((t) => `- [x] ${t.title}`).join('\n') : '_None_'),
   });
 

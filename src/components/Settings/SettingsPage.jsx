@@ -1,158 +1,174 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  Settings as SettingsIcon, Sun, Moon, Upload, DatabaseZap, Trash2, Cpu,
-  RefreshCw, CheckCircle2, XCircle, FileJson, HardDriveDownload, Info,
+  Settings, Sun, Moon, Database, Download, Upload, Trash2, HardDrive,
+  FileJson, Check, AlertTriangle, Keyboard, Terminal, Save,
 } from 'lucide-react';
 import { useStore } from '../../lib/store';
+import { getDataLocation } from '../../lib/storage';
 import { isOllamaAvailable, getOllamaModels } from '../../lib/ollama';
-import { buildVault, vaultToMarkdown, download } from '../../lib/obsidian';
 
-export default function SettingsPage({ theme, onToggleTheme }) {
-  const s = useStore();
-  const fileRef = useRef(null);
-  const [aiState, setAiState] = useState(null); // null | 'checking' | {ok, models}
+export default function SettingsPage() {
+  const { settings, setSetting, clearAllData, importData, addToast } = useStore();
+  const [dataLoc, setDataLoc] = useState('…');
+  const [savingState, setSavingState] = useState('checking');
+  const [models, setModels] = useState([]);
+  const [ollamaOk, setOllamaOk] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      const loc = await getDataLocation();
+      setDataLoc(loc || 'browser storage (localStorage)');
+      setSavingState('ok');
+      const ok = await isOllamaAvailable();
+      setOllamaOk(ok);
+      if (ok) getOllamaModels().then(setModels).catch(() => setModels([]));
+    })();
+  }, []);
 
   const exportJson = () => {
-    const snap = s.exportSnapshot();
-    download(`habitt-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(snap, null, 2), 'application/json');
-    s.setSetting('exported', true);
-    s.addToast({ type: 'success', message: 'Backup exported' });
-    s.checkAchievements();
+    const s = useStore.getState();
+    const blob = new Blob([JSON.stringify(s.exportSnapshot(), null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `habitt-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    addToast({ type: 'success', message: 'Backup downloaded' });
   };
 
-  const exportVault = () => {
-    const files = buildVault(s);
-    download(`habitt-vault-${new Date().toISOString().slice(0, 10)}.md`, vaultToMarkdown(files));
-    s.setSetting('exported', true);
-    s.addToast({ type: 'success', message: `Obsidian vault exported — ${files.length} notes` });
-    s.checkAchievements();
+  const importJson = async (file) => {
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!data.app || !data.habits) throw new Error('Not a Habitt backup file');
+      importData(data);
+      addToast({ type: 'success', message: 'Backup restored' });
+    } catch (e) {
+      addToast({ type: 'error', message: `Import failed: ${e.message}` });
+    }
   };
-
-  const importJson = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const data = JSON.parse(String(reader.result));
-        if (!data || typeof data !== 'object' || !('habits' in data)) throw new Error('bad format');
-        s.importData(data);
-        setTimeout(() => s.checkAchievements(), 100);
-      } catch {
-        s.addToast({ type: 'error', message: 'That file is not a valid Habitt backup' });
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  };
-
-  const checkAI = async () => {
-    setAiState('checking');
-    const ok = await isOllamaAvailable();
-    const models = ok ? await getOllamaModels() : [];
-    setAiState({ ok, models });
-  };
-
-  const counts = [
-    { l: 'Habits', v: s.habits.length }, { l: 'Check-ins', v: s.completions.length },
-    { l: 'Journal', v: s.journalEntries.length }, { l: 'Tasks', v: s.tasks.length },
-    { l: 'Homework', v: s.homework.length }, { l: 'Notes', v: s.notes.length },
-    { l: 'Day notes', v: s.dayNotes.length }, { l: 'Focus (min)', v: s.focusSessions.reduce((a, f) => a + (f.duration_minutes || 0), 0) },
-  ];
-  const bytes = (() => { try { return new Blob([JSON.stringify(useStore.getState(), (k, v) => (typeof v === 'function' ? undefined : v))]).size; } catch { return 0; } })();
 
   return (
-    <div style={{ maxWidth: 780 }}>
-      <div className="page-head">
-        <h2 className="page-title"><SettingsIcon size={22} color="var(--text-muted)" /> Settings</h2>
-        <p className="page-sub">Everything lives on this device. No accounts, no cloud, no tracking.</p>
+    <div style={{ maxWidth: 720, margin: '0 auto' }}>
+      <div style={{ marginBottom: 18 }}>
+        <h2 className="page-title"><Settings size={22} color="var(--text-muted)" /> Settings</h2>
+        <p className="page-sub">Appearance, data and integrations.</p>
       </div>
 
-      <Section icon={<span style={{ fontSize: 16 }}>🎨</span>} title="Appearance">
-        <Row title="Theme" desc="Light or dark — follows your system by default until you choose.">
-          <button className="btn" onClick={onToggleTheme}>{theme === 'dark' ? <Moon size={15} /> : <Sun size={15} />} {theme === 'dark' ? 'Dark' : 'Light'}</button>
-        </Row>
-      </Section>
-
-      <Section icon={<Cpu size={16} color="var(--violet)" />} title="Local AI (Ollama)">
-        <Row title="Use Ollama for journal reflections" desc="If Ollama is running on this machine (localhost:11434), your daily reflection is generated locally by a model. Without it, a built-in on-device engine writes the reflection instead — the app never phones home.">
-          <label className="switch">
-            <input type="checkbox" checked={!!s.settings.ollamaEnabled} onChange={(e) => s.setSetting('ollamaEnabled', e.target.checked)} />
-            <span className="track" /><span className="thumb" />
-          </label>
-        </Row>
-        <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button className="btn btn-sm" onClick={checkAI} disabled={aiState === 'checking'}>
-            {aiState === 'checking' ? <span className="spinner" /> : <RefreshCw size={13} />} Test connection
+      <section className="card card-pad set-sec">
+        <h3 className="set-head"><Sun size={15} color="var(--amber)" /> Appearance</h3>
+        <div className="set-row">
+          <div>
+            <b>Theme</b>
+            <div className="set-sub">Light for daylight, dark for night-owl sessions.</div>
+          </div>
+          <button className="btn btn-sm" onClick={() => useStore.getState().toggleTheme()}>
+            {settings.theme === 'dark' ? <><Moon size={13} /> Dark</> : <><Sun size={13} /> Light</>}
           </button>
-          {aiState && aiState !== 'checking' && (aiState.ok ? (
-            <>
-              <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', color: 'var(--accent)', fontWeight: 700, fontSize: '0.8rem' }}><CheckCircle2 size={14} /> Online · {aiState.models.length} models</span>
-              <select className="select" style={{ width: 220, padding: '6px 10px', fontSize: '0.8rem' }} value={s.settings.ollamaModel || ''} onChange={(e) => s.setSetting('ollamaModel', e.target.value)}>
-                <option value="">Auto (llama3.2)</option>
-                {aiState.models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
-              </select>
-            </>
-          ) : (
-            <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', color: 'var(--text-faint)', fontWeight: 650, fontSize: '0.8rem' }}><XCircle size={14} /> Not running — falling back to built-in reflections</span>
-          ))}
         </div>
-      </Section>
+        <div className="set-row">
+          <div>
+            <b>Collapsible sidebar</b>
+            <div className="set-sub">Collapse it any time with the button in the sidebar or Ctrl+B.</div>
+          </div>
+          <span className="chip"><Check size={10} /> always on</span>
+        </div>
+      </section>
 
-      <Section icon={<DatabaseZap size={16} color="var(--blue)" />} title="Data">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, margin: '4px 0 14px' }}>
-          {counts.map((c) => (
-            <div key={c.l} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 12, padding: '10px 12px', textAlign: 'center' }}>
-              <div style={{ fontWeight: 850, fontSize: '1.15rem' }}>{c.v}</div>
-              <div style={{ fontSize: '0.64rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-faint)', fontWeight: 750 }}>{c.l}</div>
+      <section className="card card-pad set-sec">
+        <h3 className="set-head"><Database size={15} color="var(--accent)" /> Your data</h3>
+        <div className="set-row">
+          <div style={{ minWidth: 0 }}>
+            <b>Saved to</b>
+            <div className="set-sub mono">
+              {savingState === 'checking' ? 'checking…' : dataLoc}
             </div>
+            <div className="set-sub">
+              The Habitt desktop app keeps everything in <code>~/.habbitt/habits.json</code> — created automatically on first launch.
+              In the browser version the same data lives in localStorage, mirrored for safety.
+            </div>
+          </div>
+        </div>
+        <div className="set-row">
+          <div>
+            <b>Export JSON backup</b>
+            <div className="set-sub">Download habits, history, notes and journal as one file.</div>
+          </div>
+          <button className="btn btn-sm" onClick={exportJson}><Download size={13} /> Export</button>
+        </div>
+        <div className="set-row">
+          <div>
+            <b>Restore from backup</b>
+            <div className="set-sub">Replaces everything with the backup file.</div>
+          </div>
+          <label className="btn btn-sm" style={{ cursor: 'pointer' }}>
+            <Upload size={13} /> Import
+            <input type="file" accept=".json,application/json" hidden onChange={(e) => e.target.files?.[0] && importJson(e.target.files[0])} />
+          </label>
+        </div>
+        <div className="set-row">
+          <div>
+            <b style={{ color: 'var(--red, #ef4444)' }}>Delete everything</b>
+            <div className="set-sub">Removes all local data. There is no undo.</div>
+          </div>
+          <button
+            className="btn btn-sm danger-btn"
+            onClick={() => {
+              if (confirm('Delete ALL Habitt data on this device? This cannot be undone.')) {
+                clearAllData();
+                addToast({ type: 'info', message: 'All data cleared' });
+              }
+            }}
+          >
+            <Trash2 size={13} /> Clear
+          </button>
+        </div>
+      </section>
+
+      <section className="card card-pad set-sec">
+        <h3 className="set-head"><Terminal size={15} color="var(--violet)" /> AI check-in (optional)</h3>
+        <div className="set-row">
+          <div>
+            <b>Ollama nightly reflection</b>
+            <div className="set-sub">
+              {ollamaOk === null ? 'Checking local Ollama…' : ollamaOk
+                ? `Ollama detected — ${models.length} model${models.length === 1 ? '' : 's'} available.`
+                : 'Not running. Start `ollama serve` locally to enable this.'}
+            </div>
+          </div>
+          <button
+            className={`toggle ${settings.ollamaEnabled && ollamaOk ? 'on' : ''}`}
+            disabled={!ollamaOk}
+            onClick={() => setSetting('ollamaEnabled', !settings.ollamaEnabled)}
+            aria-label="Toggle Ollama reflection"
+          />
+        </div>
+        {settings.ollamaEnabled && ollamaOk && (
+          <div className="field">
+            <label className="field-label"><FileJson size={10} style={{ verticalAlign: -1 }} /> Model</label>
+            <select className="select" value={settings.ollamaModel || 'llama3.2'} onChange={(e) => setSetting('ollamaModel', e.target.value)}>
+              {(models.length ? models : ['llama3.2']).map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+        )}
+      </section>
+
+      <section className="card card-pad set-sec">
+        <h3 className="set-head"><Keyboard size={15} color="var(--blue)" /> Keyboard</h3>
+        <div className="kbd-grid">
+          {[
+            ['Ctrl K', 'Command palette'], ['Ctrl N', 'New habit'], ['Ctrl J', 'Journal'],
+            ['Ctrl F', 'Focus timer'], ['Ctrl Q', 'Quick check-in'], ['Ctrl B', 'Collapse sidebar'],
+            ['Esc', 'Close / back to dashboard'], ['Enter', 'Save current note'],
+          ].map(([k, v]) => (
+            <div key={k} className="kbd-row"><kbd>{k}</kbd><span>{v}</span></div>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button className="btn" onClick={exportJson}><FileJson size={14} /> Export JSON backup</button>
-          <button className="btn" onClick={exportVault}><HardDriveDownload size={14} /> Export Obsidian vault (.md)</button>
-          <button className="btn" onClick={() => fileRef.current?.click()}><Upload size={14} /> Import backup</button>
-          <input ref={fileRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={importJson} />
-        </div>
-        <p style={{ fontSize: '0.72rem', color: 'var(--text-faint)', margin: '10px 0 0', fontWeight: 600 }}>
-          {bytes > 0 ? `Local database: ${(bytes / 1024).toFixed(1)} KB in your browser/app storage.` : ''} The vault export uses `%% ── FILE: path ── %%` separators so you can split it into Obsidian notes.
-        </p>
-        <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
-          <Row title="Danger zone" desc="Deletes habits, history, journal, tasks, notes, XP — everything. Export first.">
-            <button className="btn btn-danger" onClick={() => { if (confirm('Really delete ALL Habitt data? This cannot be undone.') && confirm('Are you absolutely sure?')) { s.clearAllData(); } }}>
-              <Trash2 size={14} /> Clear all data
-            </button>
-          </Row>
-        </div>
-      </Section>
+      </section>
 
-      <Section icon={<Info size={16} color="var(--amber)" />} title="About">
-        <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-          <b style={{ color: 'var(--text)' }}>Habitt.</b> v2.0.0 — a privacy-first habit tracker with heatmaps, streaks, journaling, tasks, homework, notes, a focus timer, XP and achievements.
-          Built with React, Vite and Tauri. Your data is stored locally (SQLite in the desktop app, browser storage on the web).
-        </p>
-      </Section>
-    </div>
-  );
-}
-
-function Section({ icon, title, children }) {
-  return (
-    <section className="card card-pad" style={{ marginBottom: 16 }}>
-      <h3 style={{ margin: '0 0 10px', fontSize: '0.92rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>{icon} {title}</h3>
-      {children}
-    </section>
-  );
-}
-
-function Row({ title, desc, children }) {
-  return (
-    <div className="settings-row">
-      <div style={{ flex: 1, minWidth: 200 }}>
-        <div style={{ fontWeight: 750, fontSize: '0.88rem' }}>{title}</div>
-        {desc && <div style={{ fontSize: '0.76rem', color: 'var(--text-faint)', marginTop: 2, lineHeight: 1.45, maxWidth: 480 }}>{desc}</div>}
-      </div>
-      {children}
+      <p className="set-foot">
+        <HardDrive size={11} style={{ verticalAlign: -1 }} /> Habitt stores everything on this device. No accounts, no cloud, no tracking.
+      </p>
     </div>
   );
 }

@@ -1,5 +1,15 @@
 import React, { useMemo, useState } from 'react';
-import { GraduationCap, Plus, Trash2, BookOpen, CalendarClock, CheckCircle2, Circle, Layers } from 'lucide-react';
+import {
+  GraduationCap,
+  Plus,
+  Trash2,
+  BookOpen,
+  CalendarClock,
+  CheckCircle2,
+  Circle,
+  Layers,
+  Flag,
+} from 'lucide-react';
 import { useStore } from '../../lib/store';
 import { getToday, formatShort } from '../../lib/utils';
 import DynIcon from '../Shared/DynIcon';
@@ -55,7 +65,7 @@ export default function HomeworkBoard() {
     const order = ['pending', 'in_progress', 'completed'];
     const next = order[(order.indexOf(hw.status) + 1) % 3];
     updateHomework(hw.id, { status: next, completed_at: next === 'completed' ? new Date().toISOString() : null });
-    if (next === 'completed') { useStore.getState().addXp(10, true); addToast({ type: 'success', message: `${hw.title} submitted! +10 XP` }); }
+    if (next === 'completed') addToast({ type: 'success', message: `${hw.title} marked complete` });
   };
 
   return (
@@ -145,7 +155,7 @@ export default function HomeworkBoard() {
                         <CalendarClock size={10} /> {hw.due_date === getToday() ? 'Due today' : `Due ${formatShort(hw.due_date)}`}
                       </span>
                     )}
-                    <span className="chip" style={{ color: prio.color }}>▲ {prio.label}</span>
+                    <span className="chip" style={{ color: prio.color }}><Flag size={9} /> {prio.label}</span>
                   </div>
                 </div>
                 <button className="btn btn-ghost btn-icon" title="Delete" onClick={() => deleteHomework(hw.id)}><Trash2 size={14} color="var(--text-faint)" /></button>

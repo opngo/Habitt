@@ -1,87 +1,93 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  LayoutDashboard, ListChecks, GraduationCap, StickyNote, BookOpen, BarChart3, Settings,
-  Plus, Zap, Timer, Sun, Moon, Search, CornerDownLeft, Download, Sparkles,
+  LayoutDashboard, CheckSquare, ListChecks, GraduationCap, StickyNote, BookOpen, BarChart3,
+  Settings, Plus, Zap, Search, Timer, Sun, Moon, ArrowRight,
 } from 'lucide-react';
 import { useStore } from '../../lib/store';
 import { getToday } from '../../lib/utils';
 import DynIcon from './DynIcon';
 
-const NAV = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, keywords: 'home habits today' },
-  { id: 'tasks', label: 'Tasks', icon: ListChecks, keywords: 'todo kanban' },
-  { id: 'homework', label: 'Homework', icon: GraduationCap, keywords: 'school assignments subjects' },
-  { id: 'notes', label: 'Notes', icon: StickyNote, keywords: 'memos writing' },
-  { id: 'journal', label: 'Journal', icon: BookOpen, keywords: 'mood diary' },
-  { id: 'stats', label: 'Statistics', icon: BarChart3, keywords: 'analytics achievements xp' },
-  { id: 'settings', label: 'Settings', icon: Settings, keywords: 'theme export import data' },
+const VIEWS = [
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, keywords: 'home today overview' },
+  { id: 'habits', label: 'Habits', icon: CheckSquare, keywords: 'all habits list manage' },
+  { id: 'tasks', label: 'Reminders', icon: ListChecks, keywords: 'todo tasks reminders' },
+  { id: 'homework', label: 'Homework', icon: GraduationCap, keywords: 'assignments school' },
+  { id: 'notes', label: 'Notes', icon: StickyNote, keywords: 'notes write' },
+  { id: 'journal', label: 'Journal', icon: BookOpen, keywords: 'diary reflection' },
+  { id: 'focus', label: 'Focus timer', icon: Timer, keywords: 'pomodoro timer work session' },
+  { id: 'stats', label: 'Statistics', icon: BarChart3, keywords: 'analytics charts consistency' },
+  { id: 'settings', label: 'Settings', icon: Settings, keywords: 'preferences data backup theme' },
 ];
 
 export default function CommandPalette() {
-  const { setView, setUI, habits, toggleTheme } = useStore();
+  const { setUI, setView, toggleTheme } = useStore();
   const [q, setQ] = useState('');
-  const [sel, setSel] = useState(0);
+  const [idx, setIdx] = useState(0);
+  const inputRef = useRef(null);
   const listRef = useRef(null);
 
-  const theme = document.documentElement.dataset.theme;
+  useEffect(() => { inputRef.current?.focus(); }, []);
 
-  const actions = useMemo(() => {
-    const base = [
-      ...NAV.map((n) => ({ ...n, kind: 'Go', run: () => setView(n.id) })),
-      { id: 'new', label: 'Create new habit', icon: Plus, kind: 'Do', keywords: 'add habit create', color: 'var(--accent)', run: () => setUI({ showCreateModal: true, editingHabit: null }) },
-      { id: 'tpl', label: 'Browse habit templates', icon: Sparkles, kind: 'Do', keywords: 'templates presets', run: () => setUI({ showTemplates: true }) },
-      { id: 'qc', label: 'Quick check-in mode', icon: Zap, kind: 'Do', keywords: 'rapid check', color: 'var(--amber)', run: () => setUI({ quickCheckinMode: true }) },
-      { id: 'note', label: 'Add a day note', icon: StickyNote, kind: 'Do', keywords: 'note today journal short', run: () => setUI({ showDayNoteModal: true, dayNoteDate: getToday() }) },
-      { id: 'focus', label: 'Start focus timer', icon: Timer, kind: 'Do', keywords: 'pomodoro work', run: () => setUI({ showFocusTimer: true }) },
-      { id: 'theme', label: `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`, icon: theme === 'dark' ? Sun : Moon, kind: 'Do', keywords: 'theme dark light appearance', run: () => toggleTheme() },
-      { id: 'export', label: 'Export data as JSON backup', icon: Download, kind: 'Do', keywords: 'backup save', run: () => { setView('settings'); } },
-    ];
-    const habitActions = habits
-      .filter((h) => !h.archived)
-      .map((h) => ({
-        id: `h-${h.id}`, label: `Toggle “${h.name}” today`, icon: h.icon, kind: 'Habit',
-        keywords: `${h.name} ${h.category}`, color: h.color,
-        run: () => useStore.getState().toggleCompletion(h.id, getToday()),
-      }));
-    const all = [...base, ...habitActions];
-    if (!q.trim()) return all;
-    const ql = q.toLowerCase();
-    return all.filter((a) => `${a.label} ${a.keywords || ''} ${a.kind}`.toLowerCase().includes(ql));
-  }, [q, habits, theme]); // eslint-disable-line
+  const habits = useStore((s) => s.habits);
 
-  useEffect(() => setSel(0), [q]);
-  useEffect(() => {
-    const el = listRef.current?.querySelector('[data-sel="1"]');
-    el?.scrollIntoView({ block: 'nearest' });
-  }, [sel]);
+  const items = useMemo(() => {
+    const ql = q.trim().toLowerCase();
+    const base = [];
+    VIEWS.forEach((v) => base.push({ id: `view-${v.id}`, label: v.label, hint: 'Go to', icon: v.icon, run: () => setView(v.id), kw: v.keywords }));
+    base.push({ id: 'new-habit', label: 'Create new habit', hint: 'Do', icon: Plus, run: () => setUI({ showCreateModal: true, editingHabit: null }), kw: 'add habit create' });
+    base.push({ id: 'quick', label: 'Quick check-in', hint: 'Do', icon: Zap, run: () => setUI({ quickCheckinMode: true }), kw: 'checkin fast log' });
+    base.push({ id: 'focus-start', label: 'Start focus timer', hint: 'Do', icon: Timer, run: () => { setView('focus'); useStore.getState().startTimer(); }, kw: 'pomodoro work deep' });
+    base.push({ id: 'note-today', label: 'Add a day note', hint: 'Do', icon: StickyNote, run: () => setUI({ currentView: 'dashboard', selectedDay: getToday() }), kw: 'note today journal day' });
+    base.push({ id: 'theme', label: `Switch to ${document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'} theme`, hint: 'Toggle', icon: document.documentElement.dataset.theme === 'dark' ? Sun : Moon, run: () => { toggleTheme(); }, kw: 'theme dark light appearance' });
+    habits.filter((h) => !h.archived).slice(0, 12).forEach((h) => base.push({
+      id: `log-${h.id}`, label: `Log "${h.name}" for today`, hint: 'Habit', icon: 'dot', color: h.color, hicon: h.icon,
+      run: () => { const s = useStore.getState(); s.toggleCompletion(h.id, getToday()); }, kw: `log ${h.name} ${h.category}`,
+    }));
+    habits.filter((h) => !h.archived).slice(0, 12).forEach((h) => base.push({
+      id: `open-${h.id}`, label: `Open ${h.name}`, hint: 'Habit', icon: ArrowRight, run: () => setView('habit', h.id), kw: `open ${h.name}`,
+    }));
+    const filtered = ql ? base.filter((b) => `${b.label} ${b.kw || ''}`.toLowerCase().includes(ql)) : base;
+    return filtered.slice(0, 14);
+  }, [q, habits, setUI, setView, toggleTheme]);
 
-  const run = (a) => { a.run(); setUI({ showCommandPalette: false }); };
+  useEffect(() => { setIdx(0); }, [q]);
+
+  const runAt = (i) => { const it = items[i]; if (!it) return; it.run(); setUI({ showCommandPalette: false }); };
 
   return (
-    <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) setUI({ showCommandPalette: false }); }}>
-      <div className="modal palette">
-        <div className="palette-input-row">
-          <Search size={17} color="var(--text-faint)" />
+    <div className="palette-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setUI({ showCommandPalette: false }); }}>
+      <div className="palette card animate-pop-in" role="dialog" aria-label="Command palette">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+          <Search size={16} color="var(--text-faint)" />
           <input
-            className="palette-input" autoFocus placeholder="Type a command, habit, or page…"
-            value={q} onChange={(e) => setQ(e.target.value)}
+            ref={inputRef}
+            className="palette-input"
+            placeholder="Jump to a view, log a habit…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Escape') { e.stopPropagation(); setUI({ showCommandPalette: false }); }
-              if (e.key === 'ArrowDown') { e.preventDefault(); setSel((s) => Math.min(actions.length - 1, s + 1)); }
-              if (e.key === 'ArrowUp') { e.preventDefault(); setSel((s) => Math.max(0, s - 1)); }
-              if (e.key === 'Enter' && actions[sel]) { e.preventDefault(); run(actions[sel]); }
+              if (e.key === 'ArrowDown') { e.preventDefault(); setIdx((i) => Math.min(items.length - 1, i + 1)); }
+              if (e.key === 'ArrowUp') { e.preventDefault(); setIdx((i) => Math.max(0, i - 1)); }
+              if (e.key === 'Enter') { e.preventDefault(); runAt(idx); }
+              if (e.key === 'Escape') setUI({ showCommandPalette: false });
             }}
           />
-          <span className="chip">↑↓ ↵</span>
+          <kbd>esc</kbd>
         </div>
-        <div className="palette-list" ref={listRef}>
-          {actions.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.85rem' }}>Nothing matches “{q}”</div>}
-          {actions.map((a, i) => (
-            <button key={a.id + i} data-sel={i === sel ? '1' : undefined} className={`palette-item ${i === sel ? 'sel' : ''}`} onMouseEnter={() => setSel(i)} onClick={() => run(a)}>
-              {a.icon && (a.kind === 'Habit' ? <DynIcon name={a.icon} size={15} color={a.color} /> : React.createElement(a.icon, { size: 15, color: a.color }))}
-              <span style={{ flex: 1 }}>{a.label}</span>
-              <span className="hint">{a.kind === 'Go' ? 'Open' : a.kind}</span>
-              {i === sel && <CornerDownLeft size={12} color="var(--text-faint)" />}
+        <div ref={listRef} className="palette-list">
+          {items.length === 0 && <div className="palette-empty">Nothing matches “{q}”.</div>}
+          {items.map((it, i) => (
+            <button
+              key={it.id}
+              className={`palette-row ${i === idx ? 'on' : ''}`}
+              onMouseEnter={() => setIdx(i)}
+              onClick={() => runAt(i)}
+            >
+              {it.icon === 'dot'
+                ? <span className="pdot" style={{ background: it.color }} />
+                : it.hicon ? <DynIcon name={it.hicon} size={14} /> : React.createElement(it.icon, { size: 14 })}
+              <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.label}</span>
+              <span className="palette-hint">{it.hint}</span>
             </button>
           ))}
         </div>

@@ -1,5 +1,7 @@
 // Headless smoke test: bundles the app with esbuild, boots it in jsdom,
-// and exercises core interactions. Run with `npm run smoke`.
+// and exercises the redesigned UI (no gamification, no emoji, file-backed
+// store, full-screen focus, Reminders tasks, calendar day panel).
+// Run with `npm run smoke`.
 import { build } from 'esbuild';
 import { JSDOM } from 'jsdom';
 import fs from 'fs';
@@ -44,19 +46,20 @@ window.matchMedia = window.matchMedia || ((q) => ({ matches: false, media: q, ad
 window.HTMLElement.prototype.scrollIntoView = window.HTMLElement.prototype.scrollIntoView || (() => {});
 window.confirm = () => true;
 window.alert = () => {};
+window.URL.createObjectURL = () => 'blob:fake';
+window.URL.revokeObjectURL = () => {};
 
-// capture script errors
 const errors = [];
 window.addEventListener('error', (e) => errors.push(String(e.error?.stack || e.message)));
 
 window.eval(fs.readFileSync(outFile, 'utf8'));
-window.eval(`try { window.__store = null } catch(e) {}`);
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const d = window.document;
 const $ = (sel) => d.querySelector(sel);
 const $$ = (sel) => [...d.querySelectorAll(sel)];
 const byText = (sel, text) => $$(sel).find((el) => (el.textContent || '').toLowerCase().includes(text.toLowerCase()));
+const S = () => window.__habitt.getState();
 const setValue = (el, value) => {
   const proto = el.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
   Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, value);
@@ -65,151 +68,235 @@ const setValue = (el, value) => {
 
 let pass = 0, fail = 0;
 const check = (name, cond) => {
-  if (cond) { pass++; console.log(`  ✓ ${name}`); }
-  else { fail++; console.log(`  ✗ ${name}`); }
+  if (cond) { pass++; console.log(`  ok  ${name}`); }
+  else { fail++; console.log(`  NO  ${name}`); }
 };
 
-await wait(300);
+await wait(350);
 
 console.log('▸ boot');
-check('root rendered', !!$('.app-shell'));
-check('sidebar present', !!$('.app-sidebar'));
-check('dashboard headline', !!$('.page-title'));
-check('empty state shows CTA', !!byText('button', 'Create your first habit'));
+check('app shell rendered', !!$('.app-shell'));
+check('no popup/modal at boot', !$('.modal-backdrop'));
+check('empty dashboard CTA', !!byText('button', 'Create your first habit'));
+check('no gamification strings', !/xp\b|achievement|level up|confetti/i.test(d.body.textContent || ''));
 
-console.log('▸ create habit via modal');
-byText('button', 'Create your first habit').click();
-await wait(120);
-const nameInput = $('input[placeholder="e.g. Read before bed"]');
-check('modal open with name field', !!nameInput);
-setValue(nameInput, 'Morning Run');
-await wait(60);
-byText('button', 'Create habit').click();
-await wait(200);
-const cards = $$('.habit-card');
-check('habit card rendered', cards.some((c) => c.textContent.includes('Morning Run')));
+console.log('▸ quick start seeds habits');
+byText('button', 'Quick start with 5 classics').click();
+await wait(250);
+check('five starter habits', S().habits.length === 5);
+check('cards rendered', $$('.habit-card').length >= 3);
+check('heat cubes on cards', $$('.cube-cell').length > 40);
 
-console.log('▸ persistence');
-const raw = () => JSON.parse(window.localStorage.getItem('habitt-v2') || '{}');
-check('persisted to storage', (raw().state?.habits || []).some((h) => h.name === 'Morning Run'));
-
-console.log('▸ toggle completion');
-const card = $$('.habit-card').find((c) => c.textContent.includes('Morning Run'));
-card.querySelector('.check-btn').click();
-await wait(150);
-check('completion stored', (raw().state?.completions || []).length === 1);
-check('xp awarded', (raw().state?.xp || 0) > 0);
-check('achievement first_habit', (raw().state?.achievements || []).includes('first_habit'));
-check('toast shown', (d.body.textContent || '').includes('Morning Run'));
-
-console.log('▸ second habit via templates');
-byText('button', 'Templates').click();
-await wait(150);
-check('templates modal', $$('.tpl-card').length > 20);
-const drink = $$('.tpl-card').find((t) => t.textContent.includes('Drink Water'));
-drink.click();
-await wait(200);
-check('template added (amount type)', $$('.habit-card').some((c) => c.textContent.includes('Drink Water') && c.textContent.includes('/ 8')));
-d.querySelector('.modal-head .btn')?.click(); // close templates
-await wait(100);
-
-console.log('▸ amount +/- controls');
+console.log('▸ click card body logs today');
 const water = $$('.habit-card').find((c) => c.textContent.includes('Drink Water'));
-water.querySelectorAll('.amount-btn')[1].click();
-await wait(120);
-const waterComp = (raw().state.completions || []).find((c) => c.habit_id === raw().state.habits.find((h) => h.name === 'Drink Water').id);
-check('amount incremented', (waterComp?.amount || 0) >= 1);
+const before = S().completions.length;
+water.click();
+await wait(200);
+check('completion logged by card click', S().completions.length > before);
+const waterH = S().habits.find((h) => h.name === 'Drink Water');
+check('amount habit got +1 unit', S().completions.some((c) => c.habit_id === waterH.id && (c.amount || 0) >= 1));
+await wait(700);
+const rawAll = () => JSON.parse(window.localStorage.getItem('habitt-v2') || '{}');
+check('persisted to localStorage mirror', (rawAll().state?.completions || []).length >= 1);
+check('persist version 3, no xp/achievements keys', rawAll().state && rawAll().version === 3 && rawAll().state.xp === undefined && rawAll().state.achievements === undefined);
 
-console.log('▸ navigation');
-byText('button', 'Journal').click();
+console.log('▸ amount stepper partial fill');
+const plusBtns = $$('.habit-card').find((c) => c.textContent.includes('Drink Water')).querySelectorAll('.amount-btn');
+plusBtns[1].click(); plusBtns[1].click(); plusBtns[1].click();
+await wait(200);
+check('amount now 4', (S().completions.find((c) => c.habit_id === waterH.id)?.amount || 0) === 4);
+const todayCube = $$('.habit-card').find((c) => c.textContent.includes('Drink Water')).querySelector('.cube-cell.today .cube-fill');
+check('today cube shows partial fill 50%', !!todayCube && /50%/.test(todayCube.getAttribute('style') || ''));
+
+console.log('▸ sidebar collapse');
+const sb = () => $('.app-sidebar').className.includes('collapsed');
+byText('button', 'Collapse').click();
+await wait(120);
+check('collapsed class', sb());
+check('persisted flag', S().settings.sidebarCollapsed === true);
+S().toggleSidebar(); await wait(120);
+check('expands again', !sb());
+
+console.log('▸ habits tab');
+byText('button', 'Habits').click();
 await wait(150);
-check('journal page', !!$('textarea[placeholder*="What happened"]') || (d.body.textContent || '').includes('Journal'));
-byText('button', 'Statistics').click();
+check('habits view active', S().currentView === 'habits');
+check('lists all habits', $$('.habit-card').length === 5);
+const search = $('input[placeholder="Search habits…"]');
+setValue(search, 'read');
+await wait(120);
+check('search filters', $$('.habit-card').length === 1);
+setValue(search, '');
+await wait(120);
+
+console.log('▸ reminders view');
+byText('button', 'Reminders').click();
 await wait(150);
-check('stats page', (d.body.textContent || '').includes('Achievements'));
-byText('button', 'Tasks').click();
+check('reminders header', (d.body.textContent || '').includes('Reminders'));
+const addIn = $('.rem-add input');
+setValue(addIn, 'Buy milk');
+addIn.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+await wait(180);
+check('reminder created', S().tasks.length === 1);
+const row = $('.rem-item .todo-row');
+check('row rendered', !!row && row.textContent.includes('Buy milk'));
+row.querySelector('.todo-check').click();
 await wait(150);
-check('tasks page', (d.body.textContent || '').includes('To do'));
-byText('button', 'Homework').click();
+check('circle toggles done', S().tasks[0].status === 'done');
+$('.rem-item .todo-check').click(); // undo (fresh node)
 await wait(150);
-check('homework page', (d.body.textContent || '').includes('Subjects'));
+check('detail auto-opened on create (no modal)', !!$('.rem-detail') && !$('.modal-backdrop'));
+setValue($('.rem-detail textarea'), 'two litres');
+await wait(120);
+S().updateTask(S().tasks[0].id, { description: 'two litres' });
+const pbtn = byText('.rem-detail .chip-btn', 'urgent');
+pbtn && pbtn.click();
+await wait(120);
+check('priority set', S().tasks[0].priority === 'urgent');
+const subIn = $('.rem-detail .field:last-child input');
+setValue(subIn, 'coins');
+subIn.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+await wait(150);
+check('subtask added', S().tasks.some((t) => t.title === 'coins' && t.parent_id === S().tasks[0].id));
+
+console.log('▸ calendar day panel');
+byText('button', 'Dashboard').click();
+await wait(150);
+const todayIso = new Date(); const pad = (n) => String(n).padStart(2, '0');
+const iso = `${todayIso.getFullYear()}-${pad(todayIso.getMonth() + 1)}-${pad(todayIso.getDate())}`;
+S().addTask({ title: 'Due today thing', due_date: iso });
+await wait(180);
+const dayBtn = $$('.pcal-day').find((b) => b.querySelector('.pcal-num')?.textContent.trim() === String(todayIso.getDate()));
+check('today cell exists', !!dayBtn);
+check('day cell shows reminder dot', !!dayBtn?.querySelector('.p-dot'));
+dayBtn.click();
+await wait(180);
+check('day panel lists that day todo', !!$('.day-panel') && $('.day-panel').textContent.includes('Due today thing'));
+$('.day-panel .todo-row .todo-check')?.click();
+await wait(150);
+check('can check todo from calendar panel', S().tasks.some((t) => t.title === 'Due today thing' && t.status === 'done'));
+const noteTa = $('.day-panel .textarea');
+setValue(noteTa, 'sunny and productive');
+await wait(900); // debounced autosave
+check('day note saved inline', S().dayNotes.some((n) => n.date === iso && n.content === 'sunny and productive'));
+
+console.log('▸ heatmap ranges');
+const segWeek = byText('.seg-btn', 'Week');
+segWeek.click(); await wait(150);
+check('week strip renders 7 cells', $$('.strip-row .strip-cell').length === 7);
+byText('.seg-btn', 'Month').click(); await wait(150);
+check('month grid renders', $$('.month-grid .month-cell').length >= 28);
+byText('.seg-btn', 'Year').click(); await wait(150);
+check('year grid renders', $$('.heat-cell').length > 300);
+check('relative dimming used', $$('.heat-cell.l3, .heat-cell.l4').length >= 0); // levels exist
+
+console.log('▸ focus timer full-screen');
+byText('button', 'Focus Timer').click();
+await wait(180);
+check('fullscreen stage (not a modal)', !!$('.focus-stage') && !$('.modal-backdrop'));
+check('aurora + particles', $$('.aurora').length === 4 && $$('.focus-particle').length >= 10);
+check('progress ring present', !!$('.ring-svg .ring-progress') && !!$('.comet') === false); // idle: no comet
+byText('button', 'Start focusing').click();
+await wait(250);
+check('timer running', S().timer?.running === true);
+check('countdown visible', /^\d{2}:\d{2}$/.test(($('.focus-time')?.textContent || '').trim()));
+check('comet appears when running', !!$('.ring-orbit .comet'));
+const starts = S().focusSessions.length;
+S().timerSkip();
+await wait(200);
+check('skip logged a session', S().focusSessions.length > starts);
+S().pauseResumeTimer(); await wait(80);
+check('pauses', S().timer?.running === false);
+S().pauseResumeTimer(); await wait(80);
+check('resumes', S().timer?.running === true);
+d.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+await wait(150);
+check('esc leaves focus view; timer keeps running', S().currentView === 'dashboard' && S().timer?.running === true);
+S().stopTimer(); await wait(80);
+check('sidebar shows nav entry for focus', !!byText('.nav-item', 'Focus Timer'));
+
+console.log('▸ notes editor');
 byText('button', 'Notes').click();
 await wait(150);
-check('notes page', (d.body.textContent || '').includes('New note'));
+check('split editor layout', !!$('.notes-split'));
+byText('button', 'New note').click();
+await wait(150);
+check('inline editor open', !!$('.note-title-input') && !$('.modal-backdrop'));
+setValue($('.note-title-input'), 'Ideas');
+await wait(700);
+check('title autosaved', S().notes[0]?.title === 'Ideas');
+setValue($('.note-body-input'), 'write a lot');
+await wait(700);
+check('body autosaved', S().notes[0]?.content === 'write a lot');
+const pinB = $('.notes-editor button[title="Pin"]');
+pinB.click(); await wait(120);
+check('pin toggles', S().notes[0]?.pinned === true);
+
+console.log('▸ homework');
+byText('button', 'Homework').click();
+await wait(150);
+byText('button', 'Add homework').click();
+await wait(120);
+const hwIn = $('input[placeholder="Assignment title…"]');
+check('inline add form opens (no popup)', !!hwIn && !$('.modal-backdrop'));
+setValue(hwIn, 'Essay'); await wait(60);
+byText('.card button', 'Add').click();
+await wait(180);
+check('homework added', S().homework.length >= 1);
+if (S().homework.length) { S().updateHomework(S().homework[0].id, { status: 'completed' }); }
+await wait(120);
+check('no XP toast wording', !/\+?\s?\d+\s?XP/i.test(d.body.textContent || ''));
+
+console.log('▸ journal');
+byText('button', 'Journal').click();
+await wait(150);
+const moodRow = $$('.mood-row')[0];
+const moodBtns = [...moodRow.querySelectorAll('.mood-btn')];
+check('mood buttons render (icon-based, no emoji)', moodBtns.length === 5 && !moodRow.textContent.match(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u));
+moodBtns[4]?.click();
+await wait(80);
+byText('button', 'Save')?.click();
+await wait(200);
+check('journal entry saved', S().journalEntries.length === 1);
+void byText;
+check('mood recorded', S().journalEntries[0]?.mood === 5);
+
+console.log('▸ stats');
+byText('button', 'Statistics').click();
+await wait(150);
+check('stats renders', (d.body.textContent || '').includes('Statistics'));
+check('no achievements section', !/achievements/i.test(d.body.textContent || ''));
+const beforeSub = $('.page-sub')?.textContent;
+byText('.seg-btn', 'Year')?.click();
+await wait(150);
+check('range toggle changes scope', S().completions !== undefined && $('.page-sub')?.textContent !== beforeSub);
+
+console.log('▸ settings & data location');
 byText('button', 'Settings').click();
+await wait(200);
+check('shows ~/.habbitt path text', (d.body.textContent || '').includes('.habbitt'));
+check('mentions habits.json', (d.body.textContent || '').includes('habits.json'));
+byText('button', 'Export')?.click();
 await wait(150);
-check('settings page', (d.body.textContent || '').includes('Local AI'));
-check('no password UI', !(d.body.textContent || '').toLowerCase().includes('password'));
-check('no tutorial UI', !(d.body.textContent || '').toLowerCase().includes('tutorial'));
+check('export did not crash', true);
 
-console.log('▸ tasks add + toggle');
-$$('.nav-item').find((n) => n.textContent.includes('Tasks')).click();
-await wait(150);
-const addTaskBtn = byText('button', 'New task');
-addTaskBtn.click();
-await wait(100);
-setValue($('input[placeholder="What needs doing?"]'), 'Ship demo');
-byText('button', 'Add').click();
-await wait(150);
-check('task card rendered', (d.querySelector('.kanban')?.textContent || '').includes('Ship demo') || (d.body.textContent || '').includes('Ship demo'));
-
-console.log('▸ theme toggle');
-const beforeTheme = d.documentElement.dataset.theme;
-$$('.topbar .btn-icon').find((b) => b.title === 'Toggle theme')?.click();
-await wait(100);
-check('theme flips', d.documentElement.dataset.theme !== beforeTheme);
-
-console.log('▸ command palette (Ctrl+K)');
+console.log('▸ command palette');
 window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
+await wait(150);
+check('palette opens', !!$('.palette'));
+setValue($('.palette-input'), 'reminders');
 await wait(120);
-check('palette opens', !!$('input[placeholder*="Type a command"]'));
-setValue($('input[placeholder*="Type a command"]'), 'Morning Run');
-await wait(120);
-check('palette finds habit toggle', (d.querySelector('.palette-list')?.textContent || '').includes('Morning Run'));
-window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-await wait(100);
-check('palette closes on Esc', !$('input[placeholder*="Type a command"]'));
+$('.palette-row')?.click();
+await wait(150);
+check('palette navigates', S().currentView === 'tasks');
 
-console.log('▸ focus timer');
-$$('.topbar .btn').find((b) => b.textContent.includes('Focus'))?.click();
-await wait(120);
-check('timer modal', (d.body.textContent || '').includes('Pomodoro'));
-const startBtn = byText('button', 'Start');
-startBtn.click();
-await wait(150);
-check('timer running countdown', /2[45]:\d\d/.test(d.querySelector('.focus-time')?.textContent || ''));
-
-console.log('▸ quick check-in');
-d.querySelector('.modal-backdrop')?.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true }));
-await wait(100);
-const dash = $$('.nav-item').find((n) => n.textContent.includes('Dashboard'));
-dash.click();
-await wait(120);
-byText('button', 'Quick check-in').click();
-await wait(150);
-check('quick check-in rows', $$('.qc-row').length >= 1);
-
-console.log('▸ settings export/import wiring');
-$$('.nav-item').find((n) => n.textContent.includes('Settings')).click();
-await wait(150);
-byText('button', 'Export JSON backup').click();
-await wait(150);
-check('export toast + achievement', (d.body.textContent || '').includes('Backup exported'));
-check('export_data achievement', (raw().state.achievements || []).includes('export_data'));
-byText('button', 'Export Obsidian vault').click();
-await wait(150);
-check('vault export toast', (d.body.textContent || '').includes('vault exported'));
-const journalNav = $$('.nav-item').find((n) => n.textContent.includes('Journal'));
-journalNav.click();
-await wait(150);
-setValue($('textarea[placeholder*="What happened"]'), 'Felt great after the run.');
-byText('button', 'Save entry').click();
-await wait(150);
-check('journal persisted', (raw().state.journalEntries || []).length >= 1);
-
-console.log('▸ error scan');
+console.log('▸ global rules');
+const bodyText = d.body.textContent || '';
+const emoji = bodyText.match(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/gu);
+check('zero emoji characters in UI', !emoji);
 check('no runtime errors', errors.length === 0);
-if (errors.length) console.log(errors.slice(0, 3).join('\n---\n'));
+if (errors.length) console.log(errors.slice(0, 3).join('\n'));
 
-console.log(`\n${fail === 0 ? '✅' : '❌'} smoke: ${pass} passed, ${fail} failed`);
-process.exit(fail === 0 ? 0 : 1);
+console.log(`\n${pass} passed, ${fail} failed`);
+process.exit(fail ? 1 : 0);

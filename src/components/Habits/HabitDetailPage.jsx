@@ -10,7 +10,8 @@ import {
   formatShort, formatDisplay, getWeeksFromDays, getCompletionIntensity,
 } from '../../lib/utils';
 import { DAY_NAMES_SHORT, DIFFICULTIES } from '../../lib/constants';
-import YearHeatmap from '../Heatmap/YearHeatmap';
+import Heatmap from '../Heatmap/YearHeatmap';
+import DayNoteEditor from '../Shared/DayNoteEditor';
 import MonthCalendar from '../Shared/MonthCalendar';
 import DynIcon from '../Shared/DynIcon';
 import { getDayOfWeekStats } from '../../lib/utils';
@@ -19,6 +20,7 @@ export default function HabitDetailPage() {
   const { selectedHabitId, setView, habits, completions, vacationPeriods, toggleCompletion, startVacation, endVacation, deleteHabit, setUI, toggleChecklistItem, adjustAmount } = useStore();
   const habit = habits.find((h) => h.id === selectedHabitId);
   const [calOpen, setCalOpen] = useState(false);
+  const [noteDay, setNoteDay] = useState(null);
 
   const hc = useMemo(() => (habit ? completions.filter((c) => c.habit_id === habit.id) : []), [completions, habit]);
 
@@ -70,7 +72,7 @@ export default function HabitDetailPage() {
           <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
             <span className="chip">{habit.category}</span>
             <span className="chip">{isAvoid ? <><ShieldAlert size={10} /> avoid</> : isAmount ? <><Gauge size={10} /> {target} {habit.unit}</> : 'daily check'}</span>
-            <span className="chip"><Zap size={10} /> {diff.label} · {diff.xp} XP</span>
+            <span className="chip">{diff.label}</span>
             {habit.tags?.map((t) => <span key={t} className="chip">#{t}</span>)}
           </div>
         </div>
@@ -78,7 +80,7 @@ export default function HabitDetailPage() {
           {!isAvoid && (onVacation
             ? <button className="btn btn-sm" onClick={() => endVacation(habit.id)}><Undo2 size={14} /> End vacation</button>
             : <button className="btn btn-sm" onClick={() => startVacation(habit.id)}><Plane size={14} /> Vacation</button>)}
-          <button className="btn btn-sm" onClick={() => setUI({ showFocusTimer: true, focusTimerHabitId: habit.id })}><Timer size={14} /> Focus</button>
+          <button className="btn btn-sm" onClick={() => { setUI({ focusTimerHabitId: habit.id }); setView('focus'); }}><Timer size={14} /> Focus</button>
           <button className="btn btn-sm" onClick={() => setUI({ showCreateModal: true, editingHabit: habit })}><Pencil size={14} /> Edit</button>
           <button className="btn btn-sm btn-danger" onClick={() => { if (confirm(`Delete "${habit.name}" and its history?`)) { deleteHabit(habit.id); setView('dashboard'); } }}><Trash2 size={14} /></button>
         </div>
@@ -112,7 +114,7 @@ export default function HabitDetailPage() {
                   if (!todays) s.toggleCompletion(habit.id, today);
                   s.toggleChecklistItem(habit.id, today, item);
                 }}>
-                  <span className="box">{done && '✓'}</span>{item}
+                  <span className="box">{done && <Check size={10} strokeWidth={3.5} />}</span>{item}
                 </div>
               );
             })}
@@ -146,7 +148,7 @@ export default function HabitDetailPage() {
       <div className="grid grid-2" style={{ marginBottom: 18 }}>
         <div className="card card-pad">
           <h3 style={{ margin: '0 0 10px', fontSize: '0.9rem', fontWeight: 800 }}>All-time heatmap</h3>
-          <YearHeatmap habitId={habit.id} compact />
+          <Heatmap habitId={habit.id} />
         </div>
         <div className="card card-pad">
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
@@ -154,7 +156,7 @@ export default function HabitDetailPage() {
             <button className="btn btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setCalOpen((o) => !o)}><CalendarDays size={13} /> Calendar view</button>
           </div>
           {calOpen ? (
-            <MonthCalendar marks={marks} monthInit={today} onSelect={(ds) => setUI({ showDayNoteModal: true, dayNoteDate: ds })} />
+            <MonthCalendar marks={marks} monthInit={today} onSelect={(ds) => setNoteDay((d) => (d === ds ? null : ds))} />
           ) : (
             <div className="mini-heat" style={{ flexWrap: 'wrap', gap: 6, alignItems: 'stretch' }}>
               {recent.map((ds) => {
@@ -163,12 +165,13 @@ export default function HabitDetailPage() {
                 const amt = isAmount && c ? Math.min(1, amountOf(c) / target) : lit ? 1 : 0;
                 return (
                   <div key={ds} title={`${formatShort(ds)} — ${isAvoid ? (c ? 'slip' : 'clean') : (lit ? (isAmount ? `${amountOf(c)}/${target} ${habit.unit}` : 'done') : 'missed')}`}
-                    onClick={() => setUI({ showDayNoteModal: true, dayNoteDate: ds })}
+                    onClick={() => setNoteDay((d) => (d === ds ? null : ds))}
                     style={{ width: 26, height: 26, borderRadius: 8, background: lit ? `color-mix(in srgb, ${habit.color} ${35 + amt * 60}%, var(--surface-2))` : 'var(--surface-2)', border: '1px solid var(--border)', cursor: 'pointer' }} />
                 );
               })}
             </div>
           )}
+          {noteDay && <DayNoteEditor date={noteDay} onClose={() => setNoteDay(null)} />}
           <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
             {dowStats.map((d) => (
               <div key={d.index} style={{ flex: 1, minWidth: 40, textAlign: 'center' }} title={`${d.done} of ${d.expected || 0} possible`}>

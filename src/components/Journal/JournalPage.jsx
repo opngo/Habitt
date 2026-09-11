@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { BookOpen, ChevronLeft, ChevronRight, Sparkles, Trash2, Clock, Brain, Moon, Sun, Feather } from 'lucide-react';
+import DynIcon from '../Shared/DynIcon';
 import { useStore } from '../../lib/store';
 import { getToday, formatDisplay, expectedOnDate, amountOf } from '../../lib/utils';
 import { MOODS, ENERGIES } from '../../lib/constants';
@@ -132,7 +133,7 @@ export default function JournalPage() {
 
           <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
             <span className="chip" style={{ color: 'var(--accent)' }}><Sun size={10} /> {done.length}/{exp.length} habits</span>
-            {exp.length > 0 && done.length === exp.length && <span className="chip" style={{ color: 'var(--amber)' }}>Perfect day ⭐</span>}
+            {exp.length > 0 && done.length === exp.length && <span className="chip" style={{ color: 'var(--amber)' }}>Perfect day</span>}
             {entry && <span className="chip"><Clock size={10} /> edited {new Date(entry.updated_at || entry.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>}
           </div>
 
@@ -142,7 +143,7 @@ export default function JournalPage() {
               {MOODS.map((m) => (
                 <button key={m.value} className={`mood-btn ${draft.mood === m.value ? 'on' : ''}`} style={{ '--mc': MOOD_COLORS[m.value], borderColor: draft.mood === m.value ? MOOD_COLORS[m.value] : undefined, background: draft.mood === m.value ? `color-mix(in srgb, ${MOOD_COLORS[m.value]} 12%, transparent)` : undefined }}
                   onClick={() => setDraft((d) => ({ ...d, mood: m.value }))}>
-                  <span style={{ fontSize: '1.15rem' }}>{['😖', '🙁', '😐', '🙂', '😄'][m.value - 1]}</span>
+                  <DynIcon name={m.icon} size={19} />
                   {m.label}
                 </button>
               ))}
@@ -213,7 +214,7 @@ export default function JournalPage() {
               {sorted.map((j) => (
                 <button key={j.id} className="qc-row" style={{ '--qc': MOOD_COLORS[j.mood] || '#8b5cf6', padding: '9px 12px', background: j.date === date ? 'color-mix(in srgb, var(--violet) 8%, var(--surface))' : undefined, width: '100%', textAlign: 'left', cursor: 'pointer', border: '1px solid var(--border)', borderRadius: 12, display: 'flex', gap: 10, alignItems: 'center' }}
                   onClick={() => setUI({ journalDate: j.date })}>
-                  <span style={{ fontSize: '1.05rem' }}>{['😖', '🙁', '😐', '🙂', '😄'][(j.mood || 3) - 1]}</span>
+                  <span><DynIcon name={(MOODS.find((x) => x.value === (j.mood || 3)) || MOODS[2]).icon} size={16} /></span>
                   <span style={{ flex: 1 }}>
                     <span style={{ display: 'block', fontWeight: 750, fontSize: '0.8rem' }}>{formatDisplay(j.date).replace(/,\s\d{4}$/, '')}</span>
                     <span style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>

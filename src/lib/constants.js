@@ -39,9 +39,9 @@ export const SCHEDULE_TYPES = [
 ];
 
 export const DIFFICULTIES = [
-  { value: 'easy', label: 'Easy', xp: 5, icon: 'Leaf' },
-  { value: 'medium', label: 'Medium', xp: 10, icon: 'Flame' },
-  { value: 'hard', label: 'Hard', xp: 20, icon: 'Trophy' },
+  { value: 'easy', label: 'Easy', icon: 'Leaf' },
+  { value: 'medium', label: 'Medium', icon: 'Flame' },
+  { value: 'hard', label: 'Hard', icon: 'Trophy' },
 ];
 
 export const DAY_NAMES = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -108,38 +108,6 @@ export const HABIT_TEMPLATES = [
   { name: 'Evening Routine', icon: 'Moon', category: 'Self-Care', description: 'Wind down properly', type: 'checklist', steps: ['No screens 1hr before bed', 'Journal', 'Prepare tomorrow', 'Read', 'Lights out by 10pm'] },
   { name: 'Save Money', icon: 'PiggyBank', category: 'Finance', description: 'Put aside daily savings', type: 'amount', unit: 'dollars', target: 10 },
   { name: 'Stretching', icon: 'Move', category: 'Fitness', description: 'Morning or evening stretching', type: 'amount', unit: 'minutes', target: 10 },
-];
-
-// ── Achievements ──
-export const ACHIEVEMENTS = [
-  { id: 'first_habit', name: 'First Step', icon: 'Sprout', desc: 'Create your first habit' },
-  { id: 'five_habits', name: 'Habit Builder', icon: 'Layers', desc: 'Create 5 habits' },
-  { id: 'ten_habits', name: 'Habit Master', icon: 'Crown', desc: 'Create 10 habits' },
-  { id: 'first_checkin', name: 'Checked In', icon: 'CheckCircle2', desc: 'Complete your first habit' },
-  { id: 'streak_3', name: 'Getting Started', icon: 'Flame', desc: 'Get a 3-day streak' },
-  { id: 'streak_7', name: 'One Week', icon: 'CalendarDays', desc: 'Get a 7-day streak' },
-  { id: 'streak_30', name: 'Monthly Warrior', icon: 'Sword', desc: 'Get a 30-day streak' },
-  { id: 'streak_100', name: 'Centurion', icon: 'Shield', desc: 'Get a 100-day streak' },
-  { id: 'streak_365', name: 'Legendary', icon: 'Trophy', desc: 'Get a 365-day streak' },
-  { id: 'journal_1', name: 'Dear Diary', icon: 'PenLine', desc: 'Write your first journal entry' },
-  { id: 'journal_30', name: 'Reflection Master', icon: 'BookMarked', desc: 'Write 30 journal entries' },
-  { id: 'completions_50', name: 'Consistent', icon: 'Dumbbell', desc: '50 total completions' },
-  { id: 'completions_200', name: 'Dedicated', icon: 'Target', desc: '200 total completions' },
-  { id: 'completions_1000', name: 'Unstoppable', icon: 'Rocket', desc: '1000 total completions' },
-  { id: 'all_categories', name: 'Well Rounded', icon: 'Rainbow', desc: 'Have habits in 5+ categories' },
-  { id: 'early_bird', name: 'Early Bird', icon: 'Bird', desc: 'Complete a habit before 7am' },
-  { id: 'night_owl', name: 'Night Owl', icon: 'Moon', desc: 'Complete a habit after 10pm' },
-  { id: 'perfect_week', name: 'Perfect Week', icon: 'Star', desc: 'Complete all habits for 7 days straight' },
-  { id: 'focus_session', name: 'Focused', icon: 'Timer', desc: 'Complete a focus session' },
-  { id: 'focus_10', name: 'Deep Worker', icon: 'Focus', desc: 'Complete 10 focus sessions' },
-  { id: 'vacation_mode', name: 'Taking a Break', icon: 'Palmtree', desc: 'Use vacation mode' },
-  { id: 'day_note', name: 'Storyteller', icon: 'StickyNote', desc: 'Write a day note' },
-  { id: 'avoid_success', name: 'Breaking Free', icon: 'ShieldCheck', desc: 'Go 7 clean days on an avoid habit' },
-  { id: 'amount_goal', name: 'Goal Crusher', icon: 'Gauge', desc: 'Hit an amount goal' },
-  { id: 'checklist_done', name: 'Step by Step', icon: 'ListChecks', desc: 'Complete all checklist items' },
-  { id: 'dark_mode', name: 'Dark Side', icon: 'MoonStar', desc: 'Switch to dark mode' },
-  { id: 'export_data', name: 'Backup Pro', icon: 'HardDriveDownload', desc: 'Export your data' },
-  { id: 'all_done', name: 'Perfect Day', icon: 'PartyPopper', desc: 'Complete all habits in a day' },
 ];
 
 // ── Daily quotes ──
@@ -210,4 +178,3 @@ export const HABIT_ICON_NAMES = [
   'Tent', 'TentTree', 'Truck', 'UtensilsCrossed', 'Volleyball', 'Weight', 'Yoga',
 ];
 
-export const XP_PER_LEVEL = 100;
